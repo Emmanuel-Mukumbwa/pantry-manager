@@ -8,29 +8,29 @@ import '../models/pantry_item.dart';
 class PantryProvider extends ChangeNotifier {
   PantryProvider() {
     loadItems();
-    loadCustomUnits(); // <-- load custom units on startup
+    loadCustomUnits();
+    loadCustomCategories();
   }
 
   static const String _storageKey = 'pantry_items_v1';
   static const String _customUnitsKey = 'custom_units_v1';
+  static const String _customCategoriesKey = 'custom_categories_v1';
   static const String defaultCategory = 'Grains';
   static const String defaultUnit = 'pieces';
 
   final List<PantryItem> _items = <PantryItem>[];
   List<String> _customUnits = [];
+  List<String> _customCategories = [];
 
   List<PantryItem> get items => List.unmodifiable(_items);
   List<String> get customUnits => List.unmodifiable(_customUnits);
+  List<String> get customCategories => List.unmodifiable(_customCategories);
 
   // --- Custom units management ---
   Future<void> loadCustomUnits() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_customUnitsKey);
-    if (raw != null) {
-      _customUnits = raw.toList();
-    } else {
-      _customUnits = [];
-    }
+    _customUnits = raw != null ? raw.toList() : [];
     notifyListeners();
   }
 
@@ -49,7 +49,30 @@ class PantryProvider extends ChangeNotifier {
     }
   }
 
-  // --- Existing methods (unchanged) ---
+  // --- Custom categories management ---
+  Future<void> loadCustomCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_customCategoriesKey);
+    _customCategories = raw != null ? raw.toList() : [];
+    notifyListeners();
+  }
+
+  Future<void> saveCustomCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_customCategoriesKey, _customCategories);
+  }
+
+  Future<void> addCustomCategory(String category) async {
+    final normalized = category.trim().toLowerCase();
+    if (normalized.isEmpty) return;
+    if (!_customCategories.contains(normalized)) {
+      _customCategories.add(normalized);
+      await saveCustomCategories();
+      notifyListeners();
+    }
+  }
+
+  // --- Existing methods (unchanged except threshold type) ---
   List<PantryItem> get lowStockItems =>
       _items.where((e) => e.quantity <= e.threshold).toList(growable: false);
 
@@ -159,13 +182,14 @@ class PantryProvider extends ChangeNotifier {
     await prefs.setString(_storageKey, PantryItem.encodeItems(_items));
   }
 
+  // threshold is now double (was int)
   Future<void> addItem({
     required String name,
     required double quantity,
     required String category,
     required DateTime expiryDate,
     required String unit,
-    required int threshold,
+    required double threshold,
   }) async {
     final id = const Uuid().v4();
     final item = PantryItem(
@@ -184,6 +208,7 @@ class PantryProvider extends ChangeNotifier {
     await saveItems();
   }
 
+  // threshold is now double (was int)
   Future<void> updateItem({
     required String id,
     required String name,
@@ -191,7 +216,7 @@ class PantryProvider extends ChangeNotifier {
     required String category,
     required DateTime expiryDate,
     required String unit,
-    required int threshold,
+    required double threshold,
   }) async {
     final index = _items.indexWhere((e) => e.id == id);
     if (index == -1) return;

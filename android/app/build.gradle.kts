@@ -32,6 +32,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // APK renaming – produces aRelic_pantrymanager_debug.apk or aRelic_pantrymanager_release.apk
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "aRelic_pantrymanager_${variant.name}.apk"
+        }
+    }
 }
 
 kotlin {

@@ -100,7 +100,7 @@ class ShoppingProvider extends ChangeNotifier {
       name: item.name,
       quantity: item.quantity,
       unit: item.unit,
-      threshold: 1,
+      threshold: 1.0,               // ← now double
       category: PantryProvider.defaultCategory,
       expiryDate: DateTime.now().add(const Duration(days: 30)),
     );
@@ -122,7 +122,7 @@ class ShoppingProvider extends ChangeNotifier {
         ShoppingItem(
           id: const Uuid().v4(),
           name: p.name,
-          quantity: p.threshold.toDouble(),
+          quantity: p.threshold,    // ← p.threshold is already double
           unit: p.unit,
           isPurchased: false,
         ),

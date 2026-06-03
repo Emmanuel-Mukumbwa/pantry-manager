@@ -32,8 +32,8 @@ class PantryItem {
 
     final thresholdRaw = json['threshold'];
     final threshold = (thresholdRaw is num)
-        ? thresholdRaw.toInt()
-        : int.tryParse('$thresholdRaw') ?? 1;
+        ? thresholdRaw.toDouble()
+        : double.tryParse('$thresholdRaw') ?? 1.0;
 
     final unit = (json['unit'] as String?) ?? 'pieces';
     final category = (json['category'] as String?) ?? 'Grains';
@@ -89,7 +89,7 @@ class PantryItem {
   String category;
   DateTime expiryDate;
   String unit;
-  int threshold;
+  double threshold; // changed to double
   DateTime addedDate;
   List<ConsumptionRecord> consumptionHistory;
   DateTime? lastUsedDate;
@@ -116,7 +116,7 @@ class PantryItem {
     String? category,
     DateTime? expiryDate,
     String? unit,
-    int? threshold,
+    double? threshold,
     DateTime? addedDate,
     List<ConsumptionRecord>? consumptionHistory,
     DateTime? lastUsedDate,

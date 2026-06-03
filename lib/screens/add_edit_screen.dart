@@ -17,8 +17,8 @@ class _AddEditScreenState extends State<AddEditScreen> {
   final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
 
-  // Expanded categories
-  final List<String> _categories = const [
+  // Base categories (can be expanded)
+  final List<String> _baseCategories = const [
     'Grains',
     'Dairy',
     'Vegetables',
@@ -32,7 +32,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
     'Other',
   ];
 
-  // Base units (common)
+  // Base units
   final List<String> _baseUnits = const [
     'kg',
     'g',
@@ -66,7 +66,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
     'Other': 'piece',
   };
 
-  // Keyword-based unit detection (name contains keyword)
+  // Keyword-based unit detection
   final Map<String, String> _keywordUnit = {
     'egg': 'piece',
     'eggs': 'piece',
@@ -98,9 +98,9 @@ class _AddEditScreenState extends State<AddEditScreen> {
     'cornflakes': 'box',
   };
 
-  late String _category;
+  late String _selectedCategory;
   String _selectedUnit = 'piece';
-  int _threshold = 1;
+  double _threshold = 1.0; // 🔁 changed from int to double
   DateTime _expiryDate = DateTime.now();
 
   @override
@@ -110,17 +110,13 @@ class _AddEditScreenState extends State<AddEditScreen> {
       // Editing existing item – preserve original values
       _nameController.text = widget.item!.name;
       _quantityController.text = widget.item!.quantity.toString();
-      _category = widget.item!.category;
+      _selectedCategory = widget.item!.category;
       _selectedUnit = widget.item!.unit;
-      _threshold = widget.item!.threshold;
+      _threshold = widget.item!.threshold; // now double
       _expiryDate = widget.item!.expiryDate;
     } else {
-      _category = _categories.first;
+      _selectedCategory = _baseCategories.first;
       _suggestUnitFromNameAndCategory(); // initial suggestion
-    }
-
-    // Listen to name changes for real‑time unit suggestion (only for new items)
-    if (widget.item == null) {
       _nameController.addListener(_onNameChanged);
     }
   }
@@ -143,7 +139,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
 
     // 2. Fallback to category default
     if (suggestedUnit == null) {
-      suggestedUnit = _categoryDefaultUnit[_category] ?? 'piece';
+      suggestedUnit = _categoryDefaultUnit[_selectedCategory] ?? 'piece';
     }
 
     if (suggestedUnit != null && suggestedUnit != _selectedUnit) {
@@ -182,10 +178,10 @@ class _AddEditScreenState extends State<AddEditScreen> {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
 
+  // --- Unit dropdown with custom units ---
   List<DropdownMenuItem<String>> _buildUnitMenuItems() {
     final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
     final customUnits = pantryProvider.customUnits;
-
     final allUnits = <String>[..._baseUnits];
     for (final cu in customUnits) {
       if (!allUnits.contains(cu)) allUnits.add(cu);
@@ -199,11 +195,10 @@ class _AddEditScreenState extends State<AddEditScreen> {
       );
     }).toList();
 
-    // Add "Custom..." option
     items.add(
       const DropdownMenuItem<String>(
-        value: '__custom__',
-        child: Text('+ Custom...', style: TextStyle(color: Colors.teal)),
+        value: '__custom_unit__',
+        child: Text('+ Custom unit...', style: TextStyle(color: Colors.teal)),
       ),
     );
     return items;
@@ -246,6 +241,75 @@ class _AddEditScreenState extends State<AddEditScreen> {
       setState(() {
         _selectedUnit = result;
       });
+    }
+  }
+
+  // --- Category dropdown with custom categories ---
+  List<DropdownMenuItem<String>> _buildCategoryMenuItems() {
+    final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
+    final customCategories = pantryProvider.customCategories;
+    final allCategories = <String>[..._baseCategories];
+    for (final cc in customCategories) {
+      if (!allCategories.contains(cc)) allCategories.add(cc);
+    }
+    allCategories.sort();
+
+    final items = allCategories.map((cat) {
+      return DropdownMenuItem<String>(
+        value: cat,
+        child: Text(cat),
+      );
+    }).toList();
+
+    items.add(
+      const DropdownMenuItem<String>(
+        value: '__custom_cat__',
+        child: Text('+ Custom category...', style: TextStyle(color: Colors.teal)),
+      ),
+    );
+    return items;
+  }
+
+  Future<void> _showCustomCategoryDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add custom category'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'e.g., Seafood, Herbs',
+            labelText: 'Category name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final cat = controller.text.trim().toLowerCase();
+              if (cat.isNotEmpty) {
+                Navigator.pop(ctx, cat);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
+      await pantryProvider.addCustomCategory(result);
+      setState(() {
+        _selectedCategory = result;
+      });
+      if (widget.item == null) {
+        _suggestUnitFromNameAndCategory();
+      }
     }
   }
 
@@ -302,7 +366,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
                     border: OutlineInputBorder(),
                   ),
                   onChanged: (value) async {
-                    if (value == '__custom__') {
+                    if (value == '__custom_unit__') {
                       await _showCustomUnitDialog();
                     } else if (value != null) {
                       setState(() {
@@ -312,42 +376,43 @@ class _AddEditScreenState extends State<AddEditScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
+                // 🔁 Threshold field – now accepts decimals
                 TextFormField(
                   initialValue: _threshold.toString(),
                   decoration: const InputDecoration(
                     labelText: 'Low-stock threshold',
                     border: OutlineInputBorder(),
                   ),
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (v) {
-                    final parsed = int.tryParse(v.trim());
+                    final parsed = double.tryParse(v.trim());
                     if (parsed != null) _threshold = parsed;
                   },
                   validator: (v) {
-                    final parsed = int.tryParse(v?.trim() ?? '');
-                    if (parsed == null) return 'Enter a valid integer';
+                    final parsed = double.tryParse(v?.trim() ?? '');
+                    if (parsed == null) return 'Enter a valid number';
                     if (parsed < 0) return 'Threshold cannot be negative';
                     return null;
                   },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _category,
-                  items: _categories
-                      .map((c) => DropdownMenuItem<String>(value: c, child: Text(c)))
-                      .toList(),
+                  value: _selectedCategory,
+                  items: _buildCategoryMenuItems(),
                   decoration: const InputDecoration(
                     labelText: 'Category',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() {
-                      _category = v;
-                    });
-                    // Re‑suggest unit when category changes (only for new item)
-                    if (widget.item == null) {
-                      _suggestUnitFromNameAndCategory();
+                  onChanged: (value) async {
+                    if (value == '__custom_cat__') {
+                      await _showCustomCategoryDialog();
+                    } else if (value != null) {
+                      setState(() {
+                        _selectedCategory = value;
+                      });
+                      if (widget.item == null) {
+                        _suggestUnitFromNameAndCategory();
+                      }
                     }
                   },
                   validator: (v) {
@@ -387,20 +452,20 @@ class _AddEditScreenState extends State<AddEditScreen> {
                       await provider.addItem(
                         name: name,
                         quantity: quantity,
-                        category: _category,
+                        category: _selectedCategory,
                         expiryDate: _expiryDate,
                         unit: _selectedUnit,
-                        threshold: _threshold,
+                        threshold: _threshold, // now double
                       );
                     } else {
                       await provider.updateItem(
                         id: widget.item!.id,
                         name: name,
                         quantity: quantity,
-                        category: _category,
+                        category: _selectedCategory,
                         expiryDate: _expiryDate,
                         unit: _selectedUnit,
-                        threshold: _threshold,
+                        threshold: _threshold, // now double
                       );
                     }
                     if (!mounted) return;

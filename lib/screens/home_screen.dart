@@ -42,7 +42,7 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pantry Manager', style: TextStyle(color: Colors.black87)),
+        title: const Text('aRelic Pantry Manager', style: TextStyle(color: Colors.black87)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         actions: [

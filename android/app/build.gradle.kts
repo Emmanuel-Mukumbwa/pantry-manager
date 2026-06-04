@@ -1,11 +1,12 @@
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+
 android {
-    namespace = "com.example.my_app"
+    namespace = "com.arelic.pantrymanager"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,10 +16,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.arelic.pantrymanager"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -27,16 +25,14 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 
-    // APK renaming – produces aRelic_pantrymanager_debug.apk or aRelic_pantrymanager_release.apk
-    applicationVariants.all { variant ->
-        variant.outputs.all {
-            outputFileName = "aRelic_pantrymanager_${variant.name}.apk"
+    // APK renaming – works with AGP 8.x
+    applicationVariants.all {
+        outputs.forEach { output ->
+            (output as BaseVariantOutputImpl).outputFileName = "aRelic_pantrymanager_${name}.apk"
         }
     }
 }

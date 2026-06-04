@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/pantry_provider.dart';
+import '../providers/recipe_provider.dart'; // new import
 import 'add_edit_screen.dart';
 
 class ItemDetailScreen extends StatelessWidget {
@@ -12,7 +13,13 @@ class ItemDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pantry = context.watch<PantryProvider>();
-    final item = pantry.items.firstWhere((i) => i.id == itemId, orElse: () => throw Exception('Item not found'));
+    final item = pantry.items.firstWhere(
+      (i) => i.id == itemId,
+      orElse: () => throw Exception('Item not found'),
+    );
+
+    // We'll need the recipe provider to resolve recipe IDs to names
+    final recipeProvider = Provider.of<RecipeProvider>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(title: Text(item.name)),
@@ -27,12 +34,16 @@ class ItemDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Quantity: ${item.quantity} ${item.unit}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Quantity: ${item.quantity} ${item.unit}',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 8),
                     Text('Category: ${item.category}'),
                     Text('Threshold: ${item.threshold} ${item.unit}'),
                     Text('Added: ${DateFormat.yMMMd().format(item.addedDate)}'),
-                    if (item.lastUsedDate != null) Text('Last used: ${DateFormat.yMMMd().format(item.lastUsedDate!)}'),
+                    if (item.lastUsedDate != null)
+                      Text('Last used: ${DateFormat.yMMMd().format(item.lastUsedDate!)}'),
                     Text('Expiry: ${DateFormat.yMMMd().format(item.expiryDate)}'),
                     const SizedBox(height: 12),
                     Row(
@@ -40,14 +51,20 @@ class ItemDetailScreen extends StatelessWidget {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              final amount = await _showAmountDialog(context, item.quantity);
+                              final amount =
+                                  await _showAmountDialog(context, item.quantity);
                               if (amount != null && amount > 0) {
-                                await pantry.consumeItem(item.id, amount: amount, source: 'detail_screen');
+                                await pantry.consumeItem(
+                                  item.id,
+                                  amount: amount,
+                                  source: 'detail_screen',
+                                );
                               }
                             },
                             icon: const Icon(Icons.remove),
                             label: const Text('Consume'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -60,8 +77,14 @@ class ItemDetailScreen extends StatelessWidget {
                                   title: const Text('Discard item?'),
                                   content: const Text('This will remove the entire stock.'),
                                   actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Discard')),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Discard'),
+                                    ),
                                   ],
                                 ),
                               );
@@ -84,7 +107,8 @@ class ItemDetailScreen extends StatelessWidget {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => AddEditScreen(item: item)),
+                                MaterialPageRoute(
+                                    builder: (_) => AddEditScreen(item: item)),
                               );
                             },
                             icon: const Icon(Icons.edit),
@@ -99,10 +123,17 @@ class ItemDetailScreen extends StatelessWidget {
                                 context: context,
                                 builder: (ctx) => AlertDialog(
                                   title: const Text('Delete item?'),
-                                  content: const Text('This will permanently remove the item.'),
+                                  content:
+                                      const Text('This will permanently remove the item.'),
                                   actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Delete'),
+                                    ),
                                   ],
                                 ),
                               );
@@ -123,7 +154,8 @@ class ItemDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Consumption History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Consumption History',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ListView.separated(
               shrinkWrap: true,
@@ -132,9 +164,20 @@ class ItemDetailScreen extends StatelessWidget {
               separatorBuilder: (_, __) => const Divider(),
               itemBuilder: (context, i) {
                 final record = item.consumptionHistory[i];
+
+                // ---- NEW: resolve recipe name if available ----
+                String? recipeName;
+                if (record.recipeId != null) {
+                  recipeName =
+                      recipeProvider.getRecipeById(record.recipeId!)?.name;
+                }
+
                 return ListTile(
                   title: Text('${record.amount} ${record.unit}'),
-                  subtitle: Text('${DateFormat.yMMMd().add_jm().format(record.dateTime)} • ${record.source}'),
+                  subtitle: Text(
+                    '${DateFormat.yMMMd().add_jm().format(record.dateTime)} • '
+                    '${recipeName ?? record.source}',
+                  ),
                   trailing: Text('Left: ${record.remainingQuantity}'),
                 );
               },
@@ -164,7 +207,8 @@ class ItemDetailScreen extends StatelessWidget {
               if (val != null && val > 0 && val <= maxAmount) {
                 Navigator.pop(ctx, val);
               } else {
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Invalid amount')));
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Invalid amount')));
               }
             },
             child: const Text('Consume'),

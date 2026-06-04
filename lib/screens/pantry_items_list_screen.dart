@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/pantry_provider.dart';
+import '../providers/currency_provider.dart'; // new
 import '../models/pantry_item.dart';
 import 'add_edit_screen.dart';
 import 'item_detail_screen.dart';
@@ -59,6 +60,7 @@ class _PantryItemsListScreenState extends State<PantryItemsListScreen> {
   @override
   Widget build(BuildContext context) {
     final pantryProvider = context.watch<PantryProvider>();
+    final currencyProvider = context.watch<CurrencyProvider>();
     final items = _filteredItems;
 
     return Scaffold(
@@ -114,24 +116,47 @@ class _PantryItemsListScreenState extends State<PantryItemsListScreen> {
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
+                      final priceString = item.pricePerUnit != null
+                          ? ' • ${currencyProvider.currencySymbol}${item.pricePerUnit!.toStringAsFixed(2)}/${item.unit}'
+                          : '';
+                      final totalValueString = item.pricePerUnit != null
+                          ? '${currencyProvider.currencySymbol}${item.totalValue.toStringAsFixed(2)}'
+                          : '';
+
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: const Icon(Icons.inventory),
                           title: Text(item.name, style: const TextStyle(color: Colors.black87)),
-                          subtitle: Text('${item.quantity} ${item.unit} • ${item.category}', style: const TextStyle(color: Colors.black54)),
-                          trailing: PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert),
-                            onSelected: (value) async {
-                              if (value == 'edit') {
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => AddEditScreen(item: item)));
-                              } else if (value == 'delete') {
-                                await _confirmDelete(context, item);
-                              }
-                            },
-                            itemBuilder: (ctx) => [
-                              const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                              const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+                          subtitle: Text(
+                            '${item.quantity} ${item.unit} • ${item.category}$priceString',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (totalValueString.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Text(
+                                    totalValueString,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                  ),
+                                ),
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert),
+                                onSelected: (value) async {
+                                  if (value == 'edit') {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => AddEditScreen(item: item)));
+                                  } else if (value == 'delete') {
+                                    await _confirmDelete(context, item);
+                                  }
+                                },
+                                itemBuilder: (ctx) => [
+                                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+                                ],
+                              ),
                             ],
                           ),
                           onTap: () {
@@ -151,4 +176,4 @@ class _PantryItemsListScreenState extends State<PantryItemsListScreen> {
       ),
     );
   }
-}
+} 

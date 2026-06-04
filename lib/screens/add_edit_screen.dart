@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/pantry_item.dart';
 import '../providers/pantry_provider.dart';
+import '../providers/currency_provider.dart';
+import '../providers/expense_provider.dart';   // new
 
 class AddEditScreen extends StatefulWidget {
   const AddEditScreen({super.key, this.item});
@@ -16,8 +18,10 @@ class _AddEditScreenState extends State<AddEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
+  final _pricePerUnitController = TextEditingController();
+  final _totalPriceController = TextEditingController();
 
-  // Base categories (can be expanded)
+  // Base categories
   final List<String> _baseCategories = const [
     'Grains',
     'Dairy',
@@ -100,25 +104,138 @@ class _AddEditScreenState extends State<AddEditScreen> {
 
   late String _selectedCategory;
   String _selectedUnit = 'piece';
-  double _threshold = 1.0; // 🔁 changed from int to double
+  double _threshold = 1.0;
   DateTime _expiryDate = DateTime.now();
+  double? _pricePerUnit;
+  bool _isUpdatingPrice = false; // prevent recursive listener calls
 
   @override
   void initState() {
     super.initState();
+
+    // Listen for quantity changes to recalc both fields if needed
+    _quantityController.addListener(_onQuantityChanged);
+    // Listen for manual changes in price per unit -> compute total
+    _pricePerUnitController.addListener(_onUnitPriceChanged);
+    // Listen for manual changes in total price -> compute per unit
+    _totalPriceController.addListener(_onTotalPriceChanged);
+
     if (widget.item != null) {
-      // Editing existing item – preserve original values
       _nameController.text = widget.item!.name;
       _quantityController.text = widget.item!.quantity.toString();
       _selectedCategory = widget.item!.category;
       _selectedUnit = widget.item!.unit;
-      _threshold = widget.item!.threshold; // now double
+      _threshold = widget.item!.threshold;
       _expiryDate = widget.item!.expiryDate;
+      _pricePerUnit = widget.item!.pricePerUnit;
+      if (_pricePerUnit != null) {
+        _pricePerUnitController.text = _pricePerUnit!.toString();
+      }
     } else {
       _selectedCategory = _baseCategories.first;
-      _suggestUnitFromNameAndCategory(); // initial suggestion
+      _suggestUnitFromNameAndCategory();
       _nameController.addListener(_onNameChanged);
     }
+  }
+
+  @override
+  void dispose() {
+    if (widget.item == null) {
+      _nameController.removeListener(_onNameChanged);
+    }
+    _quantityController.removeListener(_onQuantityChanged);
+    _pricePerUnitController.removeListener(_onUnitPriceChanged);
+    _totalPriceController.removeListener(_onTotalPriceChanged);
+    _nameController.dispose();
+    _quantityController.dispose();
+    _pricePerUnitController.dispose();
+    _totalPriceController.dispose();
+    super.dispose();
+  }
+
+  // ---------- helpers ----------
+
+  double _getCurrentQuantity() {
+    final q = double.tryParse(_quantityController.text.trim());
+    return q ?? 0;
+  }
+
+  // When quantity changes, if one price field is filled, recalc the other
+  void _onQuantityChanged() {
+    if (_isUpdatingPrice) return;
+    final qty = _getCurrentQuantity();
+    if (qty <= 0) return;
+
+    final unitText = _pricePerUnitController.text.trim();
+    final totalText = _totalPriceController.text.trim();
+
+    // Precedence: if total price is filled, recalc unit price
+    if (totalText.isNotEmpty) {
+      final total = double.tryParse(totalText);
+      if (total != null) {
+        final ppu = total / qty;
+        _isUpdatingPrice = true;
+        _pricePerUnit = ppu;
+        _pricePerUnitController.text = ppu.toStringAsFixed(4);
+        _isUpdatingPrice = false;
+        return;
+      }
+    }
+    // If unit price is filled, recalc total price
+    if (unitText.isNotEmpty) {
+      final ppu = double.tryParse(unitText);
+      if (ppu != null) {
+        final total = ppu * qty;
+        _isUpdatingPrice = true;
+        _totalPriceController.text = total.toStringAsFixed(2);
+        _isUpdatingPrice = false;
+      }
+    }
+  }
+
+  // Triggered when unit price field is manually changed
+  void _onUnitPriceChanged() {
+    if (_isUpdatingPrice) return;
+    final unitText = _pricePerUnitController.text.trim();
+    if (unitText.isEmpty) {
+      _pricePerUnit = null;
+      if (_totalPriceController.text.isNotEmpty) {
+        _totalPriceController.clear();
+      }
+      return;
+    }
+    final ppu = double.tryParse(unitText);
+    if (ppu == null) return;
+    _pricePerUnit = ppu;
+
+    final qty = _getCurrentQuantity();
+    if (qty > 0) {
+      _isUpdatingPrice = true;
+      _totalPriceController.text = (ppu * qty).toStringAsFixed(2);
+      _isUpdatingPrice = false;
+    } else {
+      _isUpdatingPrice = true;
+      _totalPriceController.clear();
+      _isUpdatingPrice = false;
+    }
+  }
+
+  // Triggered when total price field is manually changed
+  void _onTotalPriceChanged() {
+    if (_isUpdatingPrice) return;
+    final totalText = _totalPriceController.text.trim();
+    if (totalText.isEmpty) {
+      return;
+    }
+    final total = double.tryParse(totalText);
+    if (total == null) return;
+    final qty = _getCurrentQuantity();
+    if (qty <= 0) return;
+    final ppu = total / qty;
+    _isUpdatingPrice = true;
+    _pricePerUnit = ppu;
+    _pricePerUnitController.text = ppu.toStringAsFixed(4);
+    _isUpdatingPrice = false;
   }
 
   void _onNameChanged() {
@@ -129,7 +246,6 @@ class _AddEditScreenState extends State<AddEditScreen> {
     final name = _nameController.text.trim().toLowerCase();
     String? suggestedUnit;
 
-    // 1. Try keyword match
     for (final entry in _keywordUnit.entries) {
       if (name.contains(entry.key)) {
         suggestedUnit = entry.value;
@@ -137,28 +253,16 @@ class _AddEditScreenState extends State<AddEditScreen> {
       }
     }
 
-    // 2. Fallback to category default
-    if (suggestedUnit == null) {
-      suggestedUnit = _categoryDefaultUnit[_selectedCategory] ?? 'piece';
-    }
+    suggestedUnit ??= _categoryDefaultUnit[_selectedCategory] ?? 'piece';
 
-    if (suggestedUnit != null && suggestedUnit != _selectedUnit) {
+    if (suggestedUnit != _selectedUnit) {
       setState(() {
         _selectedUnit = suggestedUnit!;
       });
     }
   }
 
-  @override
-  void dispose() {
-    if (widget.item == null) {
-      _nameController.removeListener(_onNameChanged);
-    }
-    _nameController.dispose();
-    _quantityController.dispose();
-    super.dispose();
-  }
-
+  // ---------- date picker ----------
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final initialDate = _expiryDate.isBefore(now) ? now : _expiryDate;
@@ -178,7 +282,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
 
-  // --- Unit dropdown with custom units ---
+  // ---------- units dropdown ----------
   List<DropdownMenuItem<String>> _buildUnitMenuItems() {
     final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
     final customUnits = pantryProvider.customUnits;
@@ -244,7 +348,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
     }
   }
 
-  // --- Category dropdown with custom categories ---
+  // ---------- categories dropdown ----------
   List<DropdownMenuItem<String>> _buildCategoryMenuItems() {
     final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
     final customCategories = pantryProvider.customCategories;
@@ -264,7 +368,8 @@ class _AddEditScreenState extends State<AddEditScreen> {
     items.add(
       const DropdownMenuItem<String>(
         value: '__custom_cat__',
-        child: Text('+ Custom category...', style: TextStyle(color: Colors.teal)),
+        child:
+            Text('+ Custom category...', style: TextStyle(color: Colors.teal)),
       ),
     );
     return items;
@@ -313,6 +418,7 @@ class _AddEditScreenState extends State<AddEditScreen> {
     }
   }
 
+  // ---------- Build UI ----------
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.item != null;
@@ -346,7 +452,8 @@ class _AddEditScreenState extends State<AddEditScreen> {
                     labelText: 'Quantity',
                     border: OutlineInputBorder(),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     final value = v?.trim() ?? '';
@@ -376,14 +483,14 @@ class _AddEditScreenState extends State<AddEditScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
-                // 🔁 Threshold field – now accepts decimals
                 TextFormField(
                   initialValue: _threshold.toString(),
                   decoration: const InputDecoration(
                     labelText: 'Low-stock threshold',
                     border: OutlineInputBorder(),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (v) {
                     final parsed = double.tryParse(v.trim());
                     if (parsed != null) _threshold = parsed;
@@ -416,11 +523,67 @@ class _AddEditScreenState extends State<AddEditScreen> {
                     }
                   },
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Select a category';
+                    if (v == null || v.trim().isEmpty)
+                      return 'Select a category';
                     return null;
                   },
                 ),
                 const SizedBox(height: 12),
+
+                // ---------- Price section (bidirectional) ----------
+                Consumer<CurrencyProvider>(
+                  builder: (context, currencyProvider, _) {
+                    return TextFormField(
+                      controller: _pricePerUnitController,
+                      decoration: InputDecoration(
+                        labelText:
+                            'Price per unit (${currencyProvider.currencySymbol}/$_selectedUnit)',
+                        hintText: 'Optional',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.attach_money),
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        if (v != null &&
+                            v.isNotEmpty &&
+                            double.tryParse(v) == null) {
+                          return 'Enter a valid price';
+                        }
+                        return null;
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                Consumer<CurrencyProvider>(
+                  builder: (context, currencyProvider, _) {
+                    return TextFormField(
+                      controller: _totalPriceController,
+                      decoration: InputDecoration(
+                        labelText:
+                            'Total price (${currencyProvider.currencySymbol})',
+                        hintText:
+                            'Auto‑calculated if per‑unit price entered',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.calculate),
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        if (v != null &&
+                            v.isNotEmpty &&
+                            double.tryParse(v) == null) {
+                          return 'Enter a valid total price';
+                        }
+                        return null;
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Expiry date
                 InputDecorator(
                   decoration: const InputDecoration(
                     labelText: 'Expiry Date',
@@ -445,29 +608,66 @@ class _AddEditScreenState extends State<AddEditScreen> {
                     if (!formState.validate()) return;
 
                     final name = _nameController.text.trim();
-                    final quantity = double.parse(_quantityController.text.trim());
+                    final quantity =
+                        double.parse(_quantityController.text.trim());
                     final provider = context.read<PantryProvider>();
+                    final expenseProvider = context.read<ExpenseProvider>(); // new
+
+                    // Compute cost for the item being saved
+                    final pricePerUnit = _pricePerUnit;
+                    final totalCost = pricePerUnit != null
+                        ? pricePerUnit * quantity
+                        : 0.0;
 
                     if (widget.item == null) {
+                      // New item
                       await provider.addItem(
                         name: name,
                         quantity: quantity,
                         category: _selectedCategory,
                         expiryDate: _expiryDate,
                         unit: _selectedUnit,
-                        threshold: _threshold, // now double
+                        threshold: _threshold,
+                        pricePerUnit: pricePerUnit,
                       );
+                      // Record purchase if price was provided
+                      if (totalCost > 0) {
+                        await expenseProvider.recordPurchase(
+                          DateTime.now(),
+                          totalCost,
+                          _selectedCategory,
+                        );
+                      }
                     } else {
+                      // Existing item: calculate old total cost for adjustment
+                      final oldItem = widget.item!;
+                      final oldTotalCost = oldItem.pricePerUnit != null
+                          ? oldItem.pricePerUnit! * oldItem.quantity
+                          : 0.0;
+
                       await provider.updateItem(
-                        id: widget.item!.id,
+                        id: oldItem.id,
                         name: name,
                         quantity: quantity,
                         category: _selectedCategory,
                         expiryDate: _expiryDate,
                         unit: _selectedUnit,
-                        threshold: _threshold, // now double
+                        threshold: _threshold,
+                        pricePerUnit: pricePerUnit,
                       );
+
+                      // Record adjustment if cost changed
+                      final newTotalCost = totalCost;
+                      final diff = newTotalCost - oldTotalCost;
+                      if (diff != 0) {
+                        await expenseProvider.recordAdjustment(
+                          DateTime.now(),
+                          diff,
+                          _selectedCategory,
+                        );
+                      }
                     }
+
                     if (!mounted) return;
                     Navigator.of(context).pop();
                   },

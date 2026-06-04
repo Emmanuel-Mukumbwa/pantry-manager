@@ -67,3 +67,4 @@ class MealPlanEntry {
     'notes': notes,
   };
 }
+ 

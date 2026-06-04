@@ -13,6 +13,7 @@ class PantryItem {
     DateTime? addedDate,
     List<ConsumptionRecord>? consumptionHistory,
     this.lastUsedDate,
+    this.pricePerUnit, // new
   }) : addedDate = addedDate ?? DateTime.now(),
        consumptionHistory = consumptionHistory ?? const <ConsumptionRecord>[];
 
@@ -43,6 +44,12 @@ class PantryItem {
     final lastUsedDate = lastUsedDateRaw != null
         ? parseDate(lastUsedDateRaw)
         : null;
+
+    double? pricePerUnit;
+    final priceRaw = json['pricePerUnit'] ?? json['price_per_unit'];
+    if (priceRaw != null) {
+      pricePerUnit = (priceRaw is num) ? priceRaw.toDouble() : double.tryParse('$priceRaw');
+    }
 
     final chRaw = json['consumptionHistory'] ?? json['consumption_history'];
     final consumptionHistory = <ConsumptionRecord>[];
@@ -80,6 +87,7 @@ class PantryItem {
       addedDate: addedDate,
       consumptionHistory: consumptionHistory,
       lastUsedDate: lastUsedDate,
+      pricePerUnit: pricePerUnit,
     );
   }
 
@@ -89,10 +97,14 @@ class PantryItem {
   String category;
   DateTime expiryDate;
   String unit;
-  double threshold; // changed to double
+  double threshold;
   DateTime addedDate;
   List<ConsumptionRecord> consumptionHistory;
   DateTime? lastUsedDate;
+  double? pricePerUnit; // price per single unit (e.g., $2.5 per kg)
+
+  /// Total value of this item in inventory (quantity × pricePerUnit)
+  double get totalValue => pricePerUnit != null ? quantity * pricePerUnit! : 0.0;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -106,6 +118,7 @@ class PantryItem {
       'addedDate': addedDate.toIso8601String(),
       'consumptionHistory': consumptionHistory.map((d) => d.toJson()).toList(),
       if (lastUsedDate != null) 'lastUsedDate': lastUsedDate!.toIso8601String(),
+      if (pricePerUnit != null) 'pricePerUnit': pricePerUnit,
     };
   }
 
@@ -120,6 +133,7 @@ class PantryItem {
     DateTime? addedDate,
     List<ConsumptionRecord>? consumptionHistory,
     DateTime? lastUsedDate,
+    double? pricePerUnit,
   }) {
     return PantryItem(
       id: id ?? this.id,
@@ -132,6 +146,7 @@ class PantryItem {
       addedDate: addedDate ?? this.addedDate,
       consumptionHistory: consumptionHistory ?? this.consumptionHistory,
       lastUsedDate: lastUsedDate ?? this.lastUsedDate,
+      pricePerUnit: pricePerUnit ?? this.pricePerUnit,
     );
   }
 

@@ -25,7 +25,7 @@ class PieChartWidget extends StatelessWidget {
       sections.add(
         PieChartSectionData(
           value: entry.value,
-          title: '${entry.value.toStringAsFixed(1)}',
+          title: entry.value.toStringAsFixed(1),
           color: colors[i % colors.length],
           radius: 80,
           titleStyle: const TextStyle(

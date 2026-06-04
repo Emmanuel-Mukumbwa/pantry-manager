@@ -23,62 +23,160 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
     'Dinner': const TimeOfDay(hour: 21, minute: 30),
   };
 
+  String _formatLockTime(TimeOfDay time) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    return DateFormat('h:mm a').format(dt);
+  }
+
+  String _capitalize(String s) =>
+      s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : s;
+
   @override
   void initState() {
     super.initState();
     _startOfWeek = _getStartOfWeek(DateTime.now());
+
+    // After the first frame, auto‑cook any overdue meals.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoCookOverdueMeals();
+    });
   }
 
-  DateTime _getStartOfWeek(DateTime date) => date.subtract(Duration(days: date.weekday - 1));
+  /// Scans all planned meals and automatically deducts ingredients
+  /// for those whose lock time has already passed.
+  Future<void> _autoCookOverdueMeals() async {
+    final mealPlanner = Provider.of<MealPlannerProvider>(context, listen: false);
+    final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
+    final recipeProvider = Provider.of<RecipeProvider>(context, listen: false);
 
-  void _previousWeek() => setState(() => _startOfWeek = _startOfWeek.subtract(const Duration(days: 7)));
-  void _nextWeek() => setState(() => _startOfWeek = _startOfWeek.add(const Duration(days: 7)));
+    final cooked = await mealPlanner.autoCookPastMeals(
+      pantryProvider: pantryProvider,
+      recipeProvider: recipeProvider,
+      isSlotPast: (entry) {
+        final mealTypeName = _capitalize(entry.mealType.name);
+        final lockTime = _mealLockTimes[mealTypeName];
+        if (lockTime == null) return true; // no lock time → consider past
 
-  /// Returns true if the given date is before today (ignoring time).
+        final now = DateTime.now();
+        final entryDate = entry.date;
+
+        // If the entry date is in the past (any previous day), it's past.
+        if (entryDate.year < now.year ||
+            (entryDate.year == now.year && entryDate.month < now.month) ||
+            (entryDate.year == now.year &&
+                entryDate.month == now.month &&
+                entryDate.day < now.day)) {
+          return true;
+        }
+
+        // If it's the same day, check the time.
+        if (entryDate.year == now.year &&
+            entryDate.month == now.month &&
+            entryDate.day == now.day) {
+          final lockDateTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            lockTime.hour,
+            lockTime.minute,
+          );
+          return now.isAfter(lockDateTime);
+        }
+
+        // Future dates are not past.
+        return false;
+      },
+    );
+
+    if (cooked > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$cooked meal(s) automatically cooked – pantry updated.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  DateTime _getStartOfWeek(DateTime date) =>
+      date.subtract(Duration(days: date.weekday - 1));
+
+  void _previousWeek() =>
+      setState(() => _startOfWeek = _startOfWeek.subtract(const Duration(days: 7)));
+
+  void _nextWeek() =>
+      setState(() => _startOfWeek = _startOfWeek.add(const Duration(days: 7)));
+
   bool _isPastDay(DateTime date) {
     final today = DateTime.now();
-    return date.year < today.year || (date.year == today.year && date.month < today.month) ||
-        (date.year == today.year && date.month == today.month && date.day < today.day);
+    return date.year < today.year ||
+        (date.year == today.year && date.month < today.month) ||
+        (date.year == today.year &&
+            date.month == today.month &&
+            date.day < today.day);
   }
 
-  /// Returns true if the meal slot for a given date and meal type is locked due to time passing.
   bool _isSlotLocked(DateTime date, String mealType) {
     final now = DateTime.now();
-    // Future days are never locked
     if (date.isAfter(now)) return false;
-    // Past days (full day before today) are fully locked
     if (_isPastDay(date)) return true;
-    // Today: check against lock time
     final lockTime = _mealLockTimes[mealType];
     if (lockTime == null) return false;
-    final lockDateTime = DateTime(now.year, now.month, now.day, lockTime.hour, lockTime.minute);
+    final lockDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      lockTime.hour,
+      lockTime.minute,
+    );
     return now.isAfter(lockDateTime);
   }
 
-  Future<void> _selectRecipeForSlot(DateTime date, String mealType, MealPlanEntry? existingEntry, List<MealPlanEntry> existingMeals) async {
+  Future<void> _selectRecipeForSlot(
+    DateTime date,
+    String mealType,
+    MealPlanEntry? existingEntry,
+    List<MealPlanEntry> existingMeals,
+  ) async {
     final recipeProvider = Provider.of<RecipeProvider>(context, listen: false);
     final allRecipes = recipeProvider.recipes;
     if (allRecipes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No recipes yet. Create one first.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No recipes yet. Create one first.')),
+      );
       return;
     }
 
-    // Exclude recipes already planned for the same slot on the same day
+    // FIXED: Use List, not Set
     final excludeIds = <String>[];
     for (final m in existingMeals) {
-      if (m.date.year == date.year && m.date.month == date.month && m.date.day == date.day && m.mealType.name.toLowerCase() == mealType.toLowerCase()) {
+      if (m.date.year == date.year &&
+          m.date.month == date.month &&
+          m.date.day == date.day &&
+          m.mealType.name.toLowerCase() == mealType.toLowerCase()) {
         if (m.recipeId.isNotEmpty) excludeIds.add(m.recipeId);
       }
     }
 
-    final selectedRecipe = await showRecipeSearchBottomSheet(context, allRecipes, excludeRecipeIds: excludeIds);
+    final selectedRecipe = await showRecipeSearchBottomSheet(
+      context,
+      allRecipes,
+      excludeRecipeIds: excludeIds, // now List<String>
+    );
     if (selectedRecipe == null) return;
 
     final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
-    final missing = recipeProvider.validateRecipeAgainstPantry(recipe: selectedRecipe, pantry: pantryProvider.items);
+    final missing = recipeProvider.validateRecipeAgainstPantry(
+      recipe: selectedRecipe,
+      pantry: pantryProvider.items,
+    );
     if (missing.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot plan: ${missing.take(2).join(', ')}'), backgroundColor: Colors.orange),
+        SnackBar(
+          content: Text('Cannot plan: ${missing.take(2).join(', ')}'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -94,11 +192,18 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
         recipeProvider: recipeProvider,
       );
       if (!success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not enough ingredients in pantry.'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Not enough ingredients in pantry.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } else {
       if (_isSlotLocked(date, mealType)) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This meal slot is locked (time has passed).')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This meal slot is locked (time has passed).')),
+        );
         return;
       }
       await mealPlanner.updateMealPlanEntry(
@@ -115,9 +220,12 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
 
   MealType _mealTypeFromString(String s) {
     switch (s.toLowerCase()) {
-      case 'breakfast': return MealType.breakfast;
-      case 'lunch': return MealType.lunch;
-      default: return MealType.dinner;
+      case 'breakfast':
+        return MealType.breakfast;
+      case 'lunch':
+        return MealType.lunch;
+      default:
+        return MealType.dinner;
     }
   }
 
@@ -165,7 +273,13 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                   date: date,
                   existingMeal: _findMeal(meals, date, MealType.breakfast),
                   isLocked: _isSlotLocked(date, 'Breakfast'),
-                  onSelect: () => _selectRecipeForSlot(date, 'Breakfast', _findMeal(meals, date, MealType.breakfast), meals),
+                  lockTimeString: _formatLockTime(_mealLockTimes['Breakfast']!),
+                  onSelect: () => _selectRecipeForSlot(
+                    date,
+                    'Breakfast',
+                    _findMeal(meals, date, MealType.breakfast),
+                    meals,
+                  ),
                 ),
                 const Divider(),
                 _MealSlot(
@@ -173,7 +287,13 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                   date: date,
                   existingMeal: _findMeal(meals, date, MealType.lunch),
                   isLocked: _isSlotLocked(date, 'Lunch'),
-                  onSelect: () => _selectRecipeForSlot(date, 'Lunch', _findMeal(meals, date, MealType.lunch), meals),
+                  lockTimeString: _formatLockTime(_mealLockTimes['Lunch']!),
+                  onSelect: () => _selectRecipeForSlot(
+                    date,
+                    'Lunch',
+                    _findMeal(meals, date, MealType.lunch),
+                    meals,
+                  ),
                 ),
                 const Divider(),
                 _MealSlot(
@@ -181,7 +301,13 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                   date: date,
                   existingMeal: _findMeal(meals, date, MealType.dinner),
                   isLocked: _isSlotLocked(date, 'Dinner'),
-                  onSelect: () => _selectRecipeForSlot(date, 'Dinner', _findMeal(meals, date, MealType.dinner), meals),
+                  lockTimeString: _formatLockTime(_mealLockTimes['Dinner']!),
+                  onSelect: () => _selectRecipeForSlot(
+                    date,
+                    'Dinner',
+                    _findMeal(meals, date, MealType.dinner),
+                    meals,
+                  ),
                 ),
               ],
             ),
@@ -194,7 +320,11 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   MealPlanEntry? _findMeal(List<MealPlanEntry> meals, DateTime date, MealType type) {
     try {
       return meals.firstWhere(
-        (m) => m.date.year == date.year && m.date.month == date.month && m.date.day == date.day && m.mealType == type,
+        (m) =>
+            m.date.year == date.year &&
+            m.date.month == date.month &&
+            m.date.day == date.day &&
+            m.mealType == type,
       );
     } catch (_) {
       return null;
@@ -208,6 +338,7 @@ class _MealSlot extends StatelessWidget {
     required this.date,
     this.existingMeal,
     required this.isLocked,
+    required this.lockTimeString,
     required this.onSelect,
   });
 
@@ -215,6 +346,7 @@ class _MealSlot extends StatelessWidget {
   final DateTime date;
   final MealPlanEntry? existingMeal;
   final bool isLocked;
+  final String lockTimeString;
   final VoidCallback onSelect;
 
   Future<void> _markAsCooked(BuildContext context, MealPlanEntry entry) async {
@@ -224,8 +356,14 @@ class _MealSlot extends StatelessWidget {
         title: const Text('Mark as cooked?'),
         content: const Text('This will deduct all ingredients from your pantry.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cook')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cook'),
+          ),
         ],
       ),
     );
@@ -240,7 +378,10 @@ class _MealSlot extends StatelessWidget {
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success ? 'Meal cooked! Stock updated.' : 'Could not deduct ingredients.'), backgroundColor: success ? Colors.green : Colors.orange),
+        SnackBar(
+          content: Text(success ? 'Meal cooked! Stock updated.' : 'Could not deduct ingredients.'),
+          backgroundColor: success ? Colors.green : Colors.orange,
+        ),
       );
     }
   }
@@ -248,19 +389,46 @@ class _MealSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recipeProvider = Provider.of<RecipeProvider>(context, listen: false);
-    final recipeName = existingMeal != null ? recipeProvider.getRecipeById(existingMeal!.recipeId)?.name ?? 'Unknown' : null;
+    final recipeName = existingMeal != null
+        ? recipeProvider.getRecipeById(existingMeal!.recipeId)?.name ?? 'Unknown'
+        : null;
 
     return ListTile(
       leading: Icon(
-        mealType == 'Breakfast' ? Icons.free_breakfast : mealType == 'Lunch' ? Icons.lunch_dining : Icons.dinner_dining,
+        mealType == 'Breakfast'
+            ? Icons.free_breakfast
+            : mealType == 'Lunch'
+                ? Icons.lunch_dining
+                : Icons.dinner_dining,
         color: Colors.black54,
       ),
-      title: Text(mealType, style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87)),
-      subtitle: Text(recipeName ?? 'Not planned', style: const TextStyle(color: Colors.black54)),
+      title: Text(
+        mealType,
+        style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            recipeName ?? 'Not planned',
+            style: const TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            isLocked ? 'Locked after $lockTimeString' : 'Editable until $lockTimeString',
+            style: TextStyle(
+              fontSize: 10,
+              color: isLocked ? Colors.red : Colors.green,
+            ),
+          ),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (existingMeal != null && existingMeal!.status == MealStatus.planned && !isLocked)
+          if (existingMeal != null &&
+              existingMeal!.status == MealStatus.planned &&
+              !isLocked)
             IconButton(
               icon: const Icon(Icons.kitchen, color: Colors.green),
               onPressed: () => _markAsCooked(context, existingMeal!),

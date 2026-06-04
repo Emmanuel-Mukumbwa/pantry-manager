@@ -5,6 +5,9 @@ import 'package:badges/badges.dart' as badges;
 import '../providers/pantry_provider.dart';
 import '../providers/shopping_provider.dart';
 import '../providers/recipe_provider.dart';
+import '../providers/currency_provider.dart';
+import '../providers/meal_planner_provider.dart';
+import '../providers/expense_provider.dart';                // new
 import '../widgets/insight_card.dart';
 import 'add_edit_screen.dart';
 import 'shopping_list_screen.dart';
@@ -12,26 +15,117 @@ import 'recipes_list_screen.dart';
 import 'meal_planner_screen.dart';
 import 'expiry_tracker_screen.dart';
 import 'pantry_items_list_screen.dart';
+import 'expense_detail_screen.dart';                       // new
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  static const _mealLockTimes = {
+    'Breakfast': TimeOfDay(hour: 9, minute: 30),
+    'Lunch': TimeOfDay(hour: 13, minute: 30),
+    'Dinner': TimeOfDay(hour: 21, minute: 30),
+  };
+
+  String _capitalize(String s) =>
+      s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : s;
+
+  Future<void> _autoCookIfNeeded(BuildContext context) async {
+    final mealPlanner = context.read<MealPlannerProvider>();
+    final pantryProvider = context.read<PantryProvider>();
+    final recipeProvider = context.read<RecipeProvider>();
+
+    final cooked = await mealPlanner.autoCookPastMeals(
+      pantryProvider: pantryProvider,
+      recipeProvider: recipeProvider,
+      isSlotPast: (entry) {
+        final mealTypeName = _capitalize(entry.mealType.name);
+        final lockTime = _mealLockTimes[mealTypeName];
+        if (lockTime == null) return true;
+        final now = DateTime.now();
+        final entryDate = entry.date;
+        if (entryDate.year < now.year ||
+            (entryDate.year == now.year && entryDate.month < now.month) ||
+            (entryDate.year == now.year &&
+                entryDate.month == now.month &&
+                entryDate.day < now.day)) {
+          return true;
+        }
+        if (entryDate.year == now.year &&
+            entryDate.month == now.month &&
+            entryDate.day == now.day) {
+          final lockDateTime = DateTime(
+            now.year, now.month, now.day,
+            lockTime.hour, lockTime.minute,
+          );
+          return now.isAfter(lockDateTime);
+        }
+        return false;
+      },
+    );
+
+    if (cooked > 0 && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$cooked meal(s) automatically cooked – pantry updated.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _showCurrencyPicker(BuildContext context) {
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Currency'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: currencyProvider.availableCurrencies.length,
+            itemBuilder: (context, index) {
+              final code = currencyProvider.availableCurrencies[index];
+              final symbol = CurrencyProvider.getSymbol(code);
+              return ListTile(
+                title: Text('$code ($symbol)'),
+                onTap: () {
+                  currencyProvider.setCurrency(code);
+                  Navigator.pop(ctx);
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoCookIfNeeded(context);
+    });
+
     final pantryProvider = Provider.of<PantryProvider>(context);
     final shoppingProvider = Provider.of<ShoppingProvider>(context);
     final recipeProvider = Provider.of<RecipeProvider>(context);
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+    final expenseProvider = Provider.of<ExpenseProvider>(context);  // new
+
+    final symbol = currencyProvider.currencySymbol;               // new
 
     final totalItems = pantryProvider.items.length;
     final lowStockCount = pantryProvider.lowStockItems.length;
     final expiringSoonCount = pantryProvider.getItemsExpiringWithin(7).length;
     final shoppingCount = shoppingProvider.unpurchasedCount;
     final recipeCount = recipeProvider.recipes.length;
+    final inventoryValue = pantryProvider.totalInventoryValue;
+    final totalSpent = expenseProvider.totalSpent;                // new
 
     final greeting = _getGreeting();
     final urgentCount = lowStockCount + expiringSoonCount;
 
-    // Build category breakdown (category name -> number of items)
     final categoryCount = <String, int>{};
     for (final item in pantryProvider.items) {
       categoryCount[item.category] = (categoryCount[item.category] ?? 0) + 1;
@@ -52,17 +146,13 @@ class HomeScreen extends StatelessWidget {
             badgeStyle: const badges.BadgeStyle(badgeColor: Colors.red),
             child: IconButton(
               icon: const Icon(Icons.notifications, color: Colors.black87),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen()));
-              },
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen())),
               tooltip: 'Urgent items',
             ),
           ),
           IconButton(
             icon: const Icon(Icons.list, color: Colors.black87),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const PantryItemsListScreen()));
-            },
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantryItemsListScreen())),
             tooltip: 'All pantry items',
           ),
         ],
@@ -94,7 +184,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Summary cards
+              // Summary cards – now with tappable inventory value / total spent card
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -108,7 +198,51 @@ class HomeScreen extends StatelessWidget {
                   _CompactSummaryCard(icon: Icons.event_available, label: 'Expiring ≤7d', value: '$expiringSoonCount', accentColor: Colors.redAccent),
                   _CompactSummaryCard(icon: Icons.shopping_cart_outlined, label: 'Shopping list', value: '$shoppingCount', accentColor: Colors.teal),
                   _CompactSummaryCard(icon: Icons.restaurant_menu, label: 'Recipes', value: '$recipeCount'),
+                  // Tappable card showing both inventory value and total spent
+                  _TappableInventoryCard(
+                    inventoryValue: '$symbol${inventoryValue.toStringAsFixed(2)}',
+                    totalSpent: '$symbol${totalSpent.toStringAsFixed(2)}',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ExpenseDetailScreen()),
+                    ),
+                  ),
                 ],
+              ),
+              const SizedBox(height: 16),
+
+              // Currency selection card
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.black.withOpacity(0.08)),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _showCurrencyPicker(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.currency_exchange, color: Color(0xFF0A6375)),
+                        const SizedBox(width: 12),
+                        const Text('Currency', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                        const Spacer(),
+                        Consumer<CurrencyProvider>(
+                          builder: (context, cp, _) {
+                            return Text(
+                              '${cp.currencyCode} (${cp.currencySymbol})',
+                              style: const TextStyle(fontSize: 14, color: Colors.black54),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.edit, size: 16, color: Colors.black54),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -228,7 +362,6 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Urgent items banner
               if (urgentCount > 0)
                 Card(
                   color: Colors.orange.shade50,
@@ -260,8 +393,14 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+// ---------- Responsive summary card ----------
 class _CompactSummaryCard extends StatelessWidget {
-  const _CompactSummaryCard({required this.icon, required this.label, required this.value, this.accentColor});
+  const _CompactSummaryCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.accentColor,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -279,22 +418,85 @@ class _CompactSummaryCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                    Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-                  ],
-                ),
-              ],
+            Icon(icon, color: color, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- Tappable inventory + total spent card ----------
+class _TappableInventoryCard extends StatelessWidget {
+  const _TappableInventoryCard({
+    required this.inventoryValue,
+    required this.totalSpent,
+    required this.onTap,
+  });
+
+  final String inventoryValue;
+  final String totalSpent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.black.withOpacity(0.08)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.attach_money, color: Colors.green, size: 20),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Inventory: $inventoryValue',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.shopping_cart_checkout, color: Colors.teal, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Spent: $totalSpent',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.chevron_right, size: 16, color: Colors.black54),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

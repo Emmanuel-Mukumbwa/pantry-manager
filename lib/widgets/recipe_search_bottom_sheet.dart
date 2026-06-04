@@ -26,7 +26,9 @@ class _RecipeSearchBottomSheetState extends State<RecipeSearchBottomSheet> {
 
   List<String> get _categories {
     final cats = <String>{};
-    for (final r in widget.allRecipes) cats.add(r.category);
+    for (final r in widget.allRecipes) {
+      cats.add(r.category);
+    }
     return cats.toList()..sort();
   }
 
@@ -66,7 +68,7 @@ class _RecipeSearchBottomSheetState extends State<RecipeSearchBottomSheet> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _categories.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (ctx, i) {
                   if (i == 0) {
                     return FilterChip(

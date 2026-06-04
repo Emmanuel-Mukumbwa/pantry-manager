@@ -65,7 +65,7 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(labelText: 'Select pantry item'),
-                    value: selectedItemId,
+                    initialValue: selectedItemId,
                     items: pantryItems.map((item) {
                       return DropdownMenuItem(
                         value: item.id,
@@ -130,7 +130,7 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
             TextField(controller: _servingsController, decoration: const InputDecoration(labelText: 'Servings'), keyboardType: TextInputType.number),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
               onChanged: (v) => setState(() => _category = v!),
               decoration: const InputDecoration(labelText: 'Category'),
@@ -220,4 +220,4 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
       ),
     );
   }
-}
+} 

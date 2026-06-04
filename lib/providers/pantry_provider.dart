@@ -26,7 +26,16 @@ class PantryProvider extends ChangeNotifier {
   List<String> get customUnits => List.unmodifiable(_customUnits);
   List<String> get customCategories => List.unmodifiable(_customCategories);
 
-  // --- Custom units management ---
+  /// Total monetary value of all items in inventory
+  double get totalInventoryValue {
+    double sum = 0.0;
+    for (final item in _items) {
+      sum += item.totalValue;
+    }
+    return sum;
+  }
+
+  // --- Custom units management (unchanged) ---
   Future<void> loadCustomUnits() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_customUnitsKey);
@@ -49,7 +58,7 @@ class PantryProvider extends ChangeNotifier {
     }
   }
 
-  // --- Custom categories management ---
+  // --- Custom categories management (unchanged) ---
   Future<void> loadCustomCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_customCategoriesKey);
@@ -72,7 +81,7 @@ class PantryProvider extends ChangeNotifier {
     }
   }
 
-  // --- Existing methods (unchanged except threshold type) ---
+  // --- Existing getters (unchanged) ---
   List<PantryItem> get lowStockItems =>
       _items.where((e) => e.quantity <= e.threshold).toList(growable: false);
 
@@ -182,7 +191,7 @@ class PantryProvider extends ChangeNotifier {
     await prefs.setString(_storageKey, PantryItem.encodeItems(_items));
   }
 
-  // threshold is now double (was int)
+  // ADD / UPDATE with pricePerUnit
   Future<void> addItem({
     required String name,
     required double quantity,
@@ -190,6 +199,7 @@ class PantryProvider extends ChangeNotifier {
     required DateTime expiryDate,
     required String unit,
     required double threshold,
+    double? pricePerUnit,
   }) async {
     final id = const Uuid().v4();
     final item = PantryItem(
@@ -202,13 +212,13 @@ class PantryProvider extends ChangeNotifier {
       threshold: threshold,
       addedDate: DateTime.now(),
       consumptionHistory: const <ConsumptionRecord>[],
+      pricePerUnit: pricePerUnit,
     );
     _items.insert(0, item);
     notifyListeners();
     await saveItems();
   }
 
-  // threshold is now double (was int)
   Future<void> updateItem({
     required String id,
     required String name,
@@ -217,6 +227,7 @@ class PantryProvider extends ChangeNotifier {
     required DateTime expiryDate,
     required String unit,
     required double threshold,
+    double? pricePerUnit,
   }) async {
     final index = _items.indexWhere((e) => e.id == id);
     if (index == -1) return;
@@ -227,6 +238,7 @@ class PantryProvider extends ChangeNotifier {
       expiryDate: expiryDate,
       unit: unit,
       threshold: threshold,
+      pricePerUnit: pricePerUnit,
     );
     notifyListeners();
     await saveItems();
@@ -238,7 +250,7 @@ class PantryProvider extends ChangeNotifier {
     await saveItems();
   }
 
-  // --- Matching logic ---
+  // --- Matching logic (unchanged) ---
   String normalizeName(String input) {
     var s = input.trim().toLowerCase();
     s = s.replaceAll(RegExp(r'[\.\,\(\)\[\]\{\}]'), ' ');
@@ -288,7 +300,7 @@ class PantryProvider extends ChangeNotifier {
     return sorted.isNotEmpty ? sorted.first : null;
   }
 
-  // --- Stock deduction with lastUsedDate tracking ---
+  // --- Stock deduction (unchanged) ---
   Future<void> consumeItem(
     String id, {
     required double amount,

@@ -42,7 +42,7 @@ class ConsumptionRecord {
       recipeId: json['recipeId'] as String?,
     );
   }
-
+ 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'id': id,

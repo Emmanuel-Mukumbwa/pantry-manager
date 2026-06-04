@@ -4,7 +4,8 @@ import 'providers/meal_planner_provider.dart';
 import 'providers/pantry_provider.dart';
 import 'providers/recipe_provider.dart';
 import 'providers/shopping_provider.dart';
-import 'providers/theme_provider.dart';
+import 'providers/currency_provider.dart';
+import 'providers/expense_provider.dart';                // new
 import 'screens/home_screen.dart';
 import 'screens/shopping_list_screen.dart';
 import 'screens/recipes_list_screen.dart';
@@ -15,6 +16,18 @@ void main() {
   runApp(const MyApp());
 }
 
+// Simple theme notifier (works in release builds)
+class ThemeNotifier extends ChangeNotifier {
+  ThemeMode _mode = ThemeMode.system;
+
+  ThemeMode get mode => _mode;
+
+  void setMode(ThemeMode mode) {
+    _mode = mode;
+    notifyListeners();
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -23,21 +36,16 @@ class MyApp extends StatelessWidget {
     const teal = Color(0xFF0A6375);
     const orange = Color(0xFFF28C38);
 
-    final lightColorScheme = const ColorScheme.light(
-      primary: teal,
-      secondary: orange,
-      surface: Colors.white,
-      background: Color(0xFFF5F5F5),
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onSurface: Colors.black87,
-      onBackground: Colors.black87,
-    );
-
-    final baseTheme = ThemeData(
+    // Light theme (high contrast, white cards with borders)
+    final lightTheme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: lightColorScheme,
+      colorScheme: const ColorScheme.light(
+        primary: teal,
+        secondary: orange,
+        surface: Colors.white,
+        onSurface: Colors.black87,
+      ),
       scaffoldBackgroundColor: const Color(0xFFF5F5F5),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
@@ -53,7 +61,8 @@ class MyApp extends StatelessWidget {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.black26),
@@ -69,15 +78,6 @@ class MyApp extends StatelessWidget {
         labelStyle: const TextStyle(color: Colors.black54),
         hintStyle: const TextStyle(color: Colors.black38),
       ),
-      cardTheme: const CardThemeData(
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: Colors.black12),
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-        ),
-        elevation: 2,
-        shadowColor: Colors.black12,
-        color: Colors.white,
-      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
@@ -92,9 +92,74 @@ class MyApp extends StatelessWidget {
       textTheme: const TextTheme(
         bodyLarge: TextStyle(color: Colors.black87, fontSize: 14),
         bodyMedium: TextStyle(color: Colors.black87, fontSize: 12),
-        titleLarge: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w500),
+        titleLarge: TextStyle(
+            color: Colors.black87, fontSize: 18, fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(
+            color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w500),
         labelLarge: TextStyle(color: Colors.black87),
+      ),
+    );
+
+    // Dark theme (high contrast)
+    final darkTheme = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: const ColorScheme.dark(
+        primary: teal,
+        secondary: orange,
+        surface: Color(0xFF1E1E1E),
+        onSurface: Colors.white,
+      ),
+      scaffoldBackgroundColor: const Color(0xFF121212),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF1E1E1E),
+        foregroundColor: teal,
+        elevation: 0,
+        titleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF2C2C2C),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white30),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white24),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: teal, width: 1.5),
+        ),
+        labelStyle: const TextStyle(color: Colors.white70),
+        hintStyle: const TextStyle(color: Colors.white38),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: teal,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        ),
+      ),
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(color: Colors.white, fontSize: 14),
+        bodyMedium: TextStyle(color: Colors.white70, fontSize: 12),
+        titleLarge: TextStyle(
+            color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(
+            color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+        labelLarge: TextStyle(color: Colors.white),
       ),
     );
 
@@ -104,21 +169,17 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ShoppingProvider()),
         ChangeNotifierProvider(create: (_) => RecipeProvider()),
         ChangeNotifierProvider(create: (_) => MealPlannerProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+        ChangeNotifierProvider(create: (_) => CurrencyProvider()),
+        ChangeNotifierProvider(create: (_) => ExpenseProvider()),   // new
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          final effectiveTheme = baseTheme.copyWith(
-            brightness: themeProvider.mode == ThemeMode.light
-                ? Brightness.light
-                : themeProvider.mode == ThemeMode.dark
-                ? Brightness.dark
-                : WidgetsBinding.instance.platformDispatcher.platformBrightness,
-          );
+      child: Consumer<ThemeNotifier>(
+        builder: (context, themeNotifier, _) {
           return MaterialApp(
             title: 'Pantry Manager V5',
-            theme: effectiveTheme,
-            themeMode: themeProvider.mode,
+            theme: lightTheme,
+            darkTheme: darkTheme,
+            themeMode: themeNotifier.mode,
             debugShowCheckedModeBanner: false,
             home: const MainNavigation(),
           );
@@ -162,7 +223,10 @@ class _MainNavigationState extends State<MainNavigation> {
               decoration: BoxDecoration(color: Color(0xFF0A6375)),
               child: Text(
                 'Pantry Manager',
-                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold),
               ),
             ),
             ListTile(
@@ -201,15 +265,54 @@ class _MainNavigationState extends State<MainNavigation> {
               leading: const Icon(Icons.warning),
               title: const Text('Expiry Tracker'),
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ExpiryTrackerScreen()),
+                );
               },
             ),
             const Divider(),
+            // Currency selector
+            ListTile(
+              leading: const Icon(Icons.attach_money),
+              title: const Text('Currency'),
+              onTap: () {
+                final currencyProvider =
+                    Provider.of<CurrencyProvider>(context, listen: false);
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Select Currency'),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: currencyProvider.availableCurrencies.length,
+                        itemBuilder: (context, index) {
+                          final code =
+                              currencyProvider.availableCurrencies[index];
+                          final symbol = CurrencyProvider.getSymbol(code);
+                          return ListTile(
+                            title: Text('$code ($symbol)'),
+                            onTap: () {
+                              currencyProvider.setCurrency(code);
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.brightness_6),
               title: const Text('Theme'),
               onTap: () {
-                final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+                final themeNotifier =
+                    Provider.of<ThemeNotifier>(context, listen: false);
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -220,21 +323,21 @@ class _MainNavigationState extends State<MainNavigation> {
                         ListTile(
                           title: const Text('Light'),
                           onTap: () {
-                            themeProvider.setMode(ThemeMode.light);
+                            themeNotifier.setMode(ThemeMode.light);
                             Navigator.pop(ctx);
                           },
                         ),
                         ListTile(
                           title: const Text('Dark'),
                           onTap: () {
-                            themeProvider.setMode(ThemeMode.dark);
+                            themeNotifier.setMode(ThemeMode.dark);
                             Navigator.pop(ctx);
                           },
                         ),
                         ListTile(
                           title: const Text('System'),
                           onTap: () {
-                            themeProvider.setMode(ThemeMode.system);
+                            themeNotifier.setMode(ThemeMode.system);
                             Navigator.pop(ctx);
                           },
                         ),
@@ -253,10 +356,14 @@ class _MainNavigationState extends State<MainNavigation> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Shopping'),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Recipes'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Meal Plan'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_cart), label: 'Shopping'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu), label: 'Recipes'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month), label: 'Meal Plan'),
         ],
       ),
     );

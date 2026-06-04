@@ -225,4 +225,61 @@ class MealPlannerProvider extends ChangeNotifier {
     notifyListeners();
     await saveMealPlan();
   }
+
+  /// ------------------------------------------------------------------
+  /// NEW: Auto‑cook any planned meals whose lock time has passed.
+  /// Returns the number of meals automatically cooked.
+  /// ------------------------------------------------------------------
+  Future<int> autoCookPastMeals({
+    required PantryProvider pantryProvider,
+    required RecipeProvider recipeProvider,
+    required bool Function(MealPlanEntry entry) isSlotPast,
+  }) async {
+    int cooked = 0;
+
+    // Iterate over a copy to avoid concurrent modification issues
+    for (final entry in List<MealPlanEntry>.from(_mealPlan)) {
+      if (entry.status != MealStatus.planned) continue;
+      if (!isSlotPast(entry)) continue;
+
+      final recipe = recipeProvider.getRecipeById(entry.recipeId);
+      if (recipe == null) continue;
+
+      final deductions = recipeProvider.buildDeductionPlanForRecipe(
+        recipe: recipe,
+        pantry: pantryProvider.items,
+      );
+      if (deductions.isEmpty) continue;
+
+      final success = await pantryProvider.deductMultipleItems(
+        deductions: deductions
+            .map((d) => (id: d.pantryItemId, amount: d.amount))
+            .toList(),
+        source: 'auto_cook_${entry.mealType.name}_${entry.date.toIso8601String()}',
+        recipeId: recipe.id,
+      );
+
+      if (success) {
+        final index = _mealPlan.indexWhere((m) => m.id == entry.id);
+        if (index != -1) {
+          _mealPlan[index] = MealPlanEntry(
+            id: entry.id,
+            date: entry.date,
+            mealType: entry.mealType,
+            recipeId: entry.recipeId,
+            status: MealStatus.cooked,
+            notes: entry.notes,
+          );
+          cooked++;
+        }
+      }
+    }
+
+    if (cooked > 0) {
+      notifyListeners();
+      await saveMealPlan();
+    }
+
+    return cooked;
+  }
 }

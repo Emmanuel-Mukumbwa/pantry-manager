@@ -8,7 +8,7 @@ import '../providers/currency_provider.dart';
 class ExpenseDetailScreen extends StatelessWidget {
   const ExpenseDetailScreen({super.key});
 
-  @override
+  @override 
   Widget build(BuildContext context) {
     final expenseProvider = context.watch<ExpenseProvider>();
     final pantryProvider = context.watch<PantryProvider>();

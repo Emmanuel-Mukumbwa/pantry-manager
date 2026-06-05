@@ -1,168 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/meal_planner_provider.dart';
 import 'providers/pantry_provider.dart';
 import 'providers/recipe_provider.dart';
 import 'providers/shopping_provider.dart';
 import 'providers/currency_provider.dart';
-import 'providers/expense_provider.dart';                // new
+import 'providers/expense_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/shopping_list_screen.dart';
 import 'screens/recipes_list_screen.dart';
 import 'screens/meal_planner_screen.dart';
 import 'screens/expiry_tracker_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/welcome_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-// Simple theme notifier (works in release builds)
-class ThemeNotifier extends ChangeNotifier {
-  ThemeMode _mode = ThemeMode.system;
-
-  ThemeMode get mode => _mode;
-
-  void setMode(ThemeMode mode) {
-    _mode = mode;
-    notifyListeners();
-  }
-}
-
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
   Widget build(BuildContext context) {
-    const teal = Color(0xFF0A6375);
-    const orange = Color(0xFFF28C38);
-
-    // Light theme (high contrast, white cards with borders)
-    final lightTheme = ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.light,
-      colorScheme: const ColorScheme.light(
-        primary: teal,
-        secondary: orange,
-        surface: Colors.white,
-        onSurface: Colors.black87,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF5F5F5),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: teal,
-        elevation: 0,
-        centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: Colors.black87,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.black26),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.black12),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: teal, width: 1.5),
-        ),
-        labelStyle: const TextStyle(color: Colors.black54),
-        hintStyle: const TextStyle(color: Colors.black38),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: teal,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        ),
-      ),
-      textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Colors.black87, fontSize: 14),
-        bodyMedium: TextStyle(color: Colors.black87, fontSize: 12),
-        titleLarge: TextStyle(
-            color: Colors.black87, fontSize: 18, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(
-            color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w500),
-        labelLarge: TextStyle(color: Colors.black87),
-      ),
-    );
-
-    // Dark theme (high contrast)
-    final darkTheme = ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: const ColorScheme.dark(
-        primary: teal,
-        secondary: orange,
-        surface: Color(0xFF1E1E1E),
-        onSurface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFF121212),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1E1E1E),
-        foregroundColor: teal,
-        elevation: 0,
-        titleTextStyle: TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFF2C2C2C),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white30),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white24),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: teal, width: 1.5),
-        ),
-        labelStyle: const TextStyle(color: Colors.white70),
-        hintStyle: const TextStyle(color: Colors.white38),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: teal,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        ),
-      ),
-      textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Colors.white, fontSize: 14),
-        bodyMedium: TextStyle(color: Colors.white70, fontSize: 12),
-        titleLarge: TextStyle(
-            color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(
-            color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-        labelLarge: TextStyle(color: Colors.white),
-      ),
-    );
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => PantryProvider()),
@@ -171,21 +37,181 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MealPlannerProvider()),
         ChangeNotifierProvider(create: (_) => ThemeNotifier()),
         ChangeNotifierProvider(create: (_) => CurrencyProvider()),
-        ChangeNotifierProvider(create: (_) => ExpenseProvider()),   // new
+        ChangeNotifierProvider(create: (_) => ExpenseProvider()),
       ],
       child: Consumer<ThemeNotifier>(
         builder: (context, themeNotifier, _) {
+          const teal = Color(0xFF0A6375);
+          const orange = Color(0xFFF28C38);
+          final lightTheme = ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            colorScheme: const ColorScheme.light(
+              primary: teal,
+              secondary: orange,
+              surface: Colors.white,
+              onSurface: Colors.black87,
+            ),
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: teal,
+              elevation: 0,
+              centerTitle: false,
+              titleTextStyle: TextStyle(
+                color: Colors.black87,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.black26),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.black12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: teal, width: 1.5),
+              ),
+              labelStyle: const TextStyle(color: Colors.black54),
+              hintStyle: const TextStyle(color: Colors.black38),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: teal,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Colors.black87, fontSize: 14),
+              bodyMedium: TextStyle(color: Colors.black87, fontSize: 12),
+              titleLarge: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600),
+              titleMedium: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500),
+              labelLarge: TextStyle(color: Colors.black87),
+            ),
+          );
+          final darkTheme = ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            colorScheme: const ColorScheme.dark(
+              primary: teal,
+              secondary: orange,
+              surface: Color(0xFF1E1E1E),
+              onSurface: Colors.white,
+            ),
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF1E1E1E),
+              foregroundColor: teal,
+              elevation: 0,
+              titleTextStyle: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: const Color(0xFF2C2C2C),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.white30),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: teal, width: 1.5),
+              ),
+              labelStyle: const TextStyle(color: Colors.white70),
+              hintStyle: const TextStyle(color: Colors.white38),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: teal,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Colors.white, fontSize: 14),
+              bodyMedium: TextStyle(color: Colors.white70, fontSize: 12),
+              titleLarge: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600),
+              titleMedium: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500),
+              labelLarge: TextStyle(color: Colors.white),
+            ),
+          );
           return MaterialApp(
             title: 'Pantry Manager V5',
             theme: lightTheme,
             darkTheme: darkTheme,
             themeMode: themeNotifier.mode,
             debugShowCheckedModeBanner: false,
-            home: const MainNavigation(),
+            initialRoute: '/',
+            routes: {
+              '/': (context) => FutureBuilder<bool>(
+                    future: WelcomeScreen.needsToShow(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Scaffold(
+                          body: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      if (snapshot.data == true) {
+                        return const WelcomeScreen();
+                      }
+                      return const MainNavigation();
+                    },
+                  ),
+              '/home': (context) => const MainNavigation(),
+            },
           );
         },
       ),
     );
+  }
+}
+
+class ThemeNotifier extends ChangeNotifier {
+  ThemeMode _mode = ThemeMode.system;
+  ThemeMode get mode => _mode;
+  void setMode(ThemeMode mode) {
+    _mode = mode;
+    notifyListeners();
   }
 }
 
@@ -198,23 +224,56 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    ShoppingListScreen(),
-    RecipesListScreen(),
-    MealPlannerScreen(),
-  ];
+  late final List<Widget> _screens;
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      const HomeScreen(),
+      const ShoppingListScreen(),
+      const RecipesListScreen(),
+      const MealPlannerScreen(),
+      SettingsScreen(
+        onReset: _handleReset,
+        onReplayTutorial: _handleReplayTutorial,
+      ),
+    ];
+  }
+
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
+
+  Future<void> _handleReset() async {
+    // Clear all providers
+    try {
+      await context.read<PantryProvider>().clearAll();
+      await context.read<ShoppingProvider>().clearAll();
+      await context.read<RecipeProvider>().clearAll();
+      await context.read<MealPlannerProvider>().clearAll();
+      await context.read<ExpenseProvider>().clearAll();
+      await context.read<CurrencyProvider>().resetToDefault();
+    } catch (_) {}
+    if (mounted) {
+      context.read<ThemeNotifier>().setMode(ThemeMode.system);
+    }
+    await WelcomeScreen.resetFlag();
+    if (!mounted) return;
+    // Navigate to the initial route – rebuilds everything and shows welcome
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+  }
+
+  Future<void> _handleReplayTutorial() async {
+    await WelcomeScreen.resetFlag();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -265,6 +324,7 @@ class _MainNavigationState extends State<MainNavigation> {
               leading: const Icon(Icons.warning),
               title: const Text('Expiry Tracker'),
               onTap: () {
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -273,7 +333,6 @@ class _MainNavigationState extends State<MainNavigation> {
               },
             ),
             const Divider(),
-            // Currency selector
             ListTile(
               leading: const Icon(Icons.attach_money),
               title: const Text('Currency'),
@@ -347,6 +406,15 @@ class _MainNavigationState extends State<MainNavigation> {
                 );
               },
             ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () {
+                _onItemTapped(4);
+                Navigator.pop(context);
+              },
+            ),
           ],
         ),
       ),
@@ -364,6 +432,8 @@ class _MainNavigationState extends State<MainNavigation> {
               icon: Icon(Icons.restaurant_menu), label: 'Recipes'),
           BottomNavigationBarItem(
               icon: Icon(Icons.calendar_month), label: 'Meal Plan'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
     );

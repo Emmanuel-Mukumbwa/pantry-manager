@@ -9,7 +9,7 @@ class AddEditScreen extends StatefulWidget {
   const AddEditScreen({super.key, this.item});
 
   final PantryItem? item;
-
+ 
   @override
   State<AddEditScreen> createState() => _AddEditScreenState();
 }
@@ -620,7 +620,77 @@ class _AddEditScreenState extends State<AddEditScreen> {
                         : 0.0;
 
                     if (widget.item == null) {
-                      // New item
+                      // ---- Duplicate detection for new items ----
+                      final duplicate = provider.findDuplicateItem(
+                        name: name,
+                        unit: _selectedUnit,
+                      );
+
+                      if (duplicate != null && mounted) {
+                        final action = await showDialog<String>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            icon: const Icon(Icons.merge_type,
+                                color: Colors.orange, size: 32),
+                            title: const Text('Similar item found'),
+                            content: Text(
+                              '"$name" looks similar to "${duplicate.name}" '
+                              '(${duplicate.quantity} ${duplicate.unit}) '
+                              'already in your pantry.\n\n'
+                              'Would you like to merge them or add as a separate item?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, 'separate'),
+                                child: const Text('Add Separate'),
+                              ),
+                              FilledButton.icon(
+                                onPressed: () => Navigator.pop(ctx, 'merge'),
+                                icon: const Icon(Icons.merge, size: 18),
+                                label: const Text('Merge'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (!mounted) return;
+
+                        if (action == 'merge') {
+                          await provider.mergeWithExistingItem(
+                            existingId: duplicate.id,
+                            addedQuantity: quantity,
+                            newExpiryDate: _expiryDate,
+                            newThreshold: _threshold,
+                            newPricePerUnit: pricePerUnit,
+                          );
+                          // Record purchase expense if price was provided
+                          if (totalCost > 0) {
+                            await expenseProvider.recordPurchase(
+                              DateTime.now(),
+                              totalCost,
+                              _selectedCategory,
+                            );
+                          }
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Merged with "${duplicate.name}" — '
+                                'new total: ${(duplicate.quantity + quantity).toStringAsFixed(1)} ${duplicate.unit}',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          Navigator.of(context).pop();
+                          return;
+                        } else if (action == null) {
+                          // Dialog dismissed — do nothing
+                          return;
+                        }
+                        // action == 'separate' → fall through to normal add
+                      }
+
+                      // New item (no duplicate or user chose "separate")
                       await provider.addItem(
                         name: name,
                         quantity: quantity,

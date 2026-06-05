@@ -16,38 +16,73 @@ class ExpiryTrackerScreen extends StatelessWidget {
     final expiring = pantry.getItemsExpiringWithin(7);
     final expired = pantry.expiredItems;
 
+    List<Widget> sections = [];
+
+    if (expired.isNotEmpty) {
+      sections.add(const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text('Expired',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.red)),
+      ));
+      for (final item in expired) {
+        sections.add(_ExpiryTile(item: item, isExpired: true));
+      }
+      sections.add(const SizedBox(height: 16));
+    }
+
+    if (expiring.isNotEmpty) {
+      sections.add(const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text('Expiring within 7 days',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange)),
+      ));
+      for (final item in expiring) {
+        sections.add(_ExpiryTile(item: item, isExpired: false));
+      }
+      sections.add(const SizedBox(height: 16));
+    }
+
+    if (pantry.lowStockItems.isNotEmpty) {
+      sections.add(const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text('Low stock',
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold)),
+      ));
+      for (final item in pantry.lowStockItems) {
+        sections.add(_LowStockTile(item: item));
+      }
+    }
+
+    if (sections.isEmpty) {
+      sections.add(const Center(child: Text('No urgent items!')));
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Expiry & Low Stock')),
+      appBar: AppBar(
+        title: const Text('Expiry & Low Stock'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: [
-          if (expired.isNotEmpty) ...[
-            const Text('Expired', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
-            const SizedBox(height: 8),
-            ...expired.map((e) => _ExpiryTile(item: e, isExpired: true)),
-            const SizedBox(height: 16),
-          ],
-          if (expiring.isNotEmpty) ...[
-            const Text('Expiring within 7 days', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
-            const SizedBox(height: 8),
-            ...expiring.map((e) => _ExpiryTile(item: e, isExpired: false)),
-            const SizedBox(height: 16),
-          ],
-          if (pantry.lowStockItems.isNotEmpty) ...[
-            const Text('Low stock', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            ...pantry.lowStockItems.map((e) => _LowStockTile(item: e)),
-          ],
-          if (expired.isEmpty && expiring.isEmpty && pantry.lowStockItems.isEmpty)
-            const Center(child: Text('No urgent items!')),
-        ],
+        children: sections,
       ),
     );
   }
 }
 
 class _ExpiryTile extends StatelessWidget {
-  const _ExpiryTile({required this.item, required this.isExpired});
+  const _ExpiryTile({
+    required this.item,
+    required this.isExpired,
+  });
 
   final PantryItem item;
   final bool isExpired;
@@ -57,19 +92,27 @@ class _ExpiryTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(isExpired ? Icons.warning : Icons.event_busy, color: isExpired ? Colors.red : Colors.orange),
-        title: Text(item.name),
-        subtitle: Text('Expires: ${item.expiryDate.toLocal().toString().split(' ').first}'),
+        leading: Icon(
+          isExpired ? Icons.warning : Icons.event_busy,
+          color: isExpired ? Colors.red : Colors.orange,
+        ),
+        title: Text(item.name, style: const TextStyle(color: Colors.black87)),
+        subtitle: Text(
+            'Expires: ${item.expiryDate.toLocal().toString().split(' ').first}',
+            style: const TextStyle(color: Colors.black54)),
         trailing: IconButton(
-          icon: const Icon(Icons.delete),
+          icon: const Icon(Icons.delete, color: Colors.red),
           onPressed: () async {
-            await context.read<PantryProvider>().discardItem(item.id, source: 'expiry_screen');
+            await context
+                .read<PantryProvider>()
+                .discardItem(item.id, source: 'expiry_screen');
           },
         ),
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ItemDetailScreen(itemId: item.id)),
+            MaterialPageRoute(
+                builder: (_) => ItemDetailScreen(itemId: item.id)),
           );
         },
       ),
@@ -88,10 +131,12 @@ class _LowStockTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: const Icon(Icons.warning_amber, color: Colors.orange),
-        title: Text(item.name),
-        subtitle: Text('${item.quantity} ${item.unit} (threshold ${item.threshold})'),
+        title: Text(item.name, style: const TextStyle(color: Colors.black87)),
+        subtitle: Text(
+            '${item.quantity} ${item.unit} (threshold ${item.threshold})',
+            style: const TextStyle(color: Colors.black54)),
         trailing: IconButton(
-          icon: const Icon(Icons.shopping_cart),
+          icon: const Icon(Icons.shopping_cart, color: Colors.teal),
           onPressed: () async {
             final shoppingProvider = context.read<ShoppingProvider>();
             await shoppingProvider.addToShoppingList(
@@ -111,7 +156,8 @@ class _LowStockTile extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ItemDetailScreen(itemId: item.id)),
+            MaterialPageRoute(
+                builder: (_) => ItemDetailScreen(itemId: item.id)),
           );
         },
       ),

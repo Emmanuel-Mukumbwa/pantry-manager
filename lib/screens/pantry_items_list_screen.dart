@@ -132,32 +132,39 @@ class _PantryItemsListScreenState extends State<PantryItemsListScreen> {
                             '${item.quantity} ${item.unit} • ${item.category}$priceString',
                             style: const TextStyle(color: Colors.black54),
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (totalValueString.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: Text(
-                                    totalValueString,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                          trailing: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 160),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (totalValueString.isNotEmpty)
+                                  Flexible(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 4),
+                                      child: Text(
+                                        totalValueString,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
                                   ),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert),
+                                  onSelected: (value) async {
+                                    if (value == 'edit') {
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => AddEditScreen(item: item)));
+                                    } else if (value == 'delete') {
+                                      await _confirmDelete(context, item);
+                                    }
+                                  },
+                                  itemBuilder: (ctx) => [
+                                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                    const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+                                  ],
                                 ),
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert),
-                                onSelected: (value) async {
-                                  if (value == 'edit') {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => AddEditScreen(item: item)));
-                                  } else if (value == 'delete') {
-                                    await _confirmDelete(context, item);
-                                  }
-                                },
-                                itemBuilder: (ctx) => [
-                                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
-                                ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailScreen(itemId: item.id)));

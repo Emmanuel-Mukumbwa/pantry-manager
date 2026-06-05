@@ -148,7 +148,6 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
       return;
     }
 
-    // FIXED: Use List, not Set
     final excludeIds = <String>[];
     for (final m in existingMeals) {
       if (m.date.year == date.year &&
@@ -162,7 +161,7 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
     final selectedRecipe = await showRecipeSearchBottomSheet(
       context,
       allRecipes,
-      excludeRecipeIds: excludeIds, // now List<String>
+      excludeRecipeIds: excludeIds,
     );
     if (selectedRecipe == null) return;
 

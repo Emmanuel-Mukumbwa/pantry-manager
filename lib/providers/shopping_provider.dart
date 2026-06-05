@@ -7,7 +7,7 @@ import 'pantry_provider.dart';
 
 class ShoppingProvider extends ChangeNotifier {
   ShoppingProvider() {
-    loadShoppingItems();
+    loadShoppingItems(); 
   }
 
   static const String _storageKey = 'shopping_items_v1';
@@ -100,7 +100,7 @@ class ShoppingProvider extends ChangeNotifier {
       name: item.name,
       quantity: item.quantity,
       unit: item.unit,
-      threshold: 1.0,               // ← now double
+      threshold: 1.0,
       category: PantryProvider.defaultCategory,
       expiryDate: DateTime.now().add(const Duration(days: 30)),
     );
@@ -122,12 +122,19 @@ class ShoppingProvider extends ChangeNotifier {
         ShoppingItem(
           id: const Uuid().v4(),
           name: p.name,
-          quantity: p.threshold,    // ← p.threshold is already double
+          quantity: p.threshold,
           unit: p.unit,
           isPurchased: false,
         ),
       );
     }
+  }
+
+  /// Clears all shopping items and saves.
+  Future<void> clearAll() async {
+    _shoppingList.clear();
+    notifyListeners();
+    await saveShoppingItems();
   }
 }
 

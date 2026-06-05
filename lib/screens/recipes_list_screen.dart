@@ -11,36 +11,33 @@ class RecipesListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final recipeProvider = context.watch<RecipeProvider>();
     return Scaffold(
-      appBar: AppBar(title: const Text('My Recipes')),
-      body:
-          recipeProvider.recipes.isEmpty
-              ? const Center(
-                child: Text('No recipes yet. Tap + to add one.'),
-              )
-              : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: recipeProvider.recipes.length,
-                itemBuilder: (context, index) {
-                  final recipe = recipeProvider.recipes[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: const Icon(Icons.restaurant_menu),
-                      title: Text(recipe.name),
-                      subtitle: Text('${recipe.servings} servings • ${recipe.category}'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RecipeDetailScreen(recipeId: recipe.id),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
+      appBar: AppBar(title: const Text('My Recipes'), backgroundColor: Colors.white, foregroundColor: Colors.black87),
+      body: recipeProvider.recipes.isEmpty
+          ? const Center(child: Text('No recipes yet. Tap + to add one.'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: recipeProvider.recipes.length,
+              itemBuilder: (context, index) {
+                final recipe = recipeProvider.recipes[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: const Icon(Icons.restaurant_menu),
+                    title: Text(recipe.name, style: const TextStyle(color: Colors.black87)),
+                    subtitle: Text('${recipe.servings} servings • ${recipe.category}', style: const TextStyle(color: Colors.black54)),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.black54),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RecipeDetailScreen(recipeId: recipe.id),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -48,7 +45,8 @@ class RecipesListScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const AddEditRecipeScreen()),
           );
         },
-        child: const Icon(Icons.add),
+        backgroundColor: const Color(0xFF0A6375),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

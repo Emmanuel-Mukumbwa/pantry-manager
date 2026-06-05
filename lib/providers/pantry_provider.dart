@@ -35,7 +35,7 @@ class PantryProvider extends ChangeNotifier {
     return sum;
   }
 
-  // --- Custom units management (unchanged) ---
+  // --- Custom units management ---
   Future<void> loadCustomUnits() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_customUnitsKey);
@@ -58,7 +58,7 @@ class PantryProvider extends ChangeNotifier {
     }
   }
 
-  // --- Custom categories management (unchanged) ---
+  // --- Custom categories management ---
   Future<void> loadCustomCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_customCategoriesKey);
@@ -81,7 +81,7 @@ class PantryProvider extends ChangeNotifier {
     }
   }
 
-  // --- Existing getters (unchanged) ---
+  // --- Existing getters ---
   List<PantryItem> get lowStockItems =>
       _items.where((e) => e.quantity <= e.threshold).toList(growable: false);
 
@@ -191,7 +191,73 @@ class PantryProvider extends ChangeNotifier {
     await prefs.setString(_storageKey, PantryItem.encodeItems(_items));
   }
 
-  // ADD / UPDATE with pricePerUnit
+  // --- NEW: Clear all data for reset ---
+  Future<void> clearAll() async {
+    _items.clear();
+    _customUnits.clear();
+    _customCategories.clear();
+    notifyListeners();
+    await saveItems();
+    await saveCustomUnits();
+    await saveCustomCategories();
+  }
+
+  /// Find an existing pantry item that is a duplicate of the given name/unit.
+  PantryItem? findDuplicateItem({
+    required String name,
+    required String unit,
+  }) {
+    for (final item in _items) {
+      if (item.unit != unit) continue;
+      if (namesMatch(query: name, candidate: item.name)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  /// Merge a new item's data into an existing item.
+  Future<void> mergeWithExistingItem({
+    required String existingId,
+    required double addedQuantity,
+    required DateTime newExpiryDate,
+    required double newThreshold,
+    double? newPricePerUnit,
+  }) async {
+    final index = _items.indexWhere((e) => e.id == existingId);
+    if (index == -1) return;
+    final existing = _items[index];
+
+    final mergedQuantity = existing.quantity + max(0.0, addedQuantity);
+
+    double? mergedPrice;
+    if (existing.pricePerUnit != null && newPricePerUnit != null) {
+      mergedPrice = mergedQuantity > 0
+          ? ((existing.pricePerUnit! * existing.quantity) +
+                  (newPricePerUnit * addedQuantity)) /
+              mergedQuantity
+          : newPricePerUnit;
+    } else {
+      mergedPrice = newPricePerUnit ?? existing.pricePerUnit;
+    }
+
+    final mergedExpiry = newExpiryDate.isAfter(existing.expiryDate)
+        ? newExpiryDate
+        : existing.expiryDate;
+
+    final mergedThreshold =
+        newThreshold > existing.threshold ? newThreshold : existing.threshold;
+
+    _items[index] = existing.copyWith(
+      quantity: mergedQuantity,
+      expiryDate: mergedExpiry,
+      threshold: mergedThreshold,
+      pricePerUnit: mergedPrice,
+    );
+    notifyListeners();
+    await saveItems();
+  }
+
   Future<void> addItem({
     required String name,
     required double quantity,
@@ -250,7 +316,7 @@ class PantryProvider extends ChangeNotifier {
     await saveItems();
   }
 
-  // --- Matching logic (unchanged) ---
+  // --- Matching logic ---
   String normalizeName(String input) {
     var s = input.trim().toLowerCase();
     s = s.replaceAll(RegExp(r'[\.\,\(\)\[\]\{\}]'), ' ');
@@ -300,7 +366,7 @@ class PantryProvider extends ChangeNotifier {
     return sorted.isNotEmpty ? sorted.first : null;
   }
 
-  // --- Stock deduction (unchanged) ---
+  // --- Stock deduction ---
   Future<void> consumeItem(
     String id, {
     required double amount,

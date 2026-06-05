@@ -8,7 +8,7 @@ class CurrencyProvider extends ChangeNotifier {
     _loadCurrency();
   }
 
-  String _currencyCode = 'USD';
+  String _currencyCode = 'MWK';
 
   String get currencyCode => _currencyCode;
 
@@ -56,4 +56,12 @@ class CurrencyProvider extends ChangeNotifier {
   }
 
   List<String> get availableCurrencies => currencySymbols.keys.toList();
+
+  /// Reset to the app's default currency (MWK) – used when user clears all data.
+  Future<void> resetToDefault() async {
+    _currencyCode = 'MWK';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, _currencyCode);
+    notifyListeners();
+  }
 }

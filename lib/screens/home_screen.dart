@@ -7,7 +7,7 @@ import '../providers/shopping_provider.dart';
 import '../providers/recipe_provider.dart';
 import '../providers/currency_provider.dart';
 import '../providers/meal_planner_provider.dart';
-import '../providers/expense_provider.dart';                // new
+import '../providers/expense_provider.dart';
 import '../widgets/insight_card.dart';
 import 'add_edit_screen.dart';
 import 'shopping_list_screen.dart';
@@ -15,7 +15,7 @@ import 'recipes_list_screen.dart';
 import 'meal_planner_screen.dart';
 import 'expiry_tracker_screen.dart';
 import 'pantry_items_list_screen.dart';
-import 'expense_detail_screen.dart';                       // new
+import 'expense_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -33,7 +33,6 @@ class HomeScreen extends StatelessWidget {
     final mealPlanner = context.read<MealPlannerProvider>();
     final pantryProvider = context.read<PantryProvider>();
     final recipeProvider = context.read<RecipeProvider>();
-
     final cooked = await mealPlanner.autoCookPastMeals(
       pantryProvider: pantryProvider,
       recipeProvider: recipeProvider,
@@ -47,9 +46,7 @@ class HomeScreen extends StatelessWidget {
             (entryDate.year == now.year && entryDate.month < now.month) ||
             (entryDate.year == now.year &&
                 entryDate.month == now.month &&
-                entryDate.day < now.day)) {
-          return true;
-        }
+                entryDate.day < now.day)) return true;
         if (entryDate.year == now.year &&
             entryDate.month == now.month &&
             entryDate.day == now.day) {
@@ -62,7 +59,6 @@ class HomeScreen extends StatelessWidget {
         return false;
       },
     );
-
     if (cooked > 0 && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -74,7 +70,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   void _showCurrencyPicker(BuildContext context) {
-    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    final cp = Provider.of<CurrencyProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -83,16 +79,13 @@ class HomeScreen extends StatelessWidget {
           width: double.maxFinite,
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: currencyProvider.availableCurrencies.length,
-            itemBuilder: (context, index) {
-              final code = currencyProvider.availableCurrencies[index];
-              final symbol = CurrencyProvider.getSymbol(code);
+            itemCount: cp.availableCurrencies.length,
+            itemBuilder: (_, i) {
+              final code = cp.availableCurrencies[i];
+              final sym = CurrencyProvider.getSymbol(code);
               return ListTile(
-                title: Text('$code ($symbol)'),
-                onTap: () {
-                  currencyProvider.setCurrency(code);
-                  Navigator.pop(ctx);
-                },
+                title: Text('$code ($sym)'),
+                onTap: () { cp.setCurrency(code); Navigator.pop(ctx); },
               );
             },
           ),
@@ -103,17 +96,14 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoCookIfNeeded(context);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoCookIfNeeded(context));
 
     final pantryProvider = Provider.of<PantryProvider>(context);
     final shoppingProvider = Provider.of<ShoppingProvider>(context);
     final recipeProvider = Provider.of<RecipeProvider>(context);
     final currencyProvider = Provider.of<CurrencyProvider>(context);
-    final expenseProvider = Provider.of<ExpenseProvider>(context);  // new
-
-    final symbol = currencyProvider.currencySymbol;               // new
+    final expenseProvider = Provider.of<ExpenseProvider>(context);
+    final symbol = currencyProvider.currencySymbol;
 
     final totalItems = pantryProvider.items.length;
     final lowStockCount = pantryProvider.lowStockItems.length;
@@ -121,8 +111,7 @@ class HomeScreen extends StatelessWidget {
     final shoppingCount = shoppingProvider.unpurchasedCount;
     final recipeCount = recipeProvider.recipes.length;
     final inventoryValue = pantryProvider.totalInventoryValue;
-    final totalSpent = expenseProvider.totalSpent;                // new
-
+    final totalSpent = expenseProvider.totalSpent;
     final greeting = _getGreeting();
     final urgentCount = lowStockCount + expiringSoonCount;
 
@@ -130,7 +119,6 @@ class HomeScreen extends StatelessWidget {
     for (final item in pantryProvider.items) {
       categoryCount[item.category] = (categoryCount[item.category] ?? 0) + 1;
     }
-
     final now = DateTime.now();
     final time24 = DateFormat('HH:mm').format(now);
 
@@ -164,27 +152,15 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '$greeting, Chef!',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
-              ),
+              Text('$greeting, Chef!',
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)),
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    'Today is ${DateFormat('EEEE, MMMM d').format(now)}',
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                  const Spacer(),
-                  Text(
-                    time24,
-                    style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
+              Row(children: [
+                Text('Today is ${DateFormat('EEEE, MMMM d').format(now)}', style: const TextStyle(color: Colors.black54)),
+                const Spacer(),
+                Text(time24, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w500)),
+              ]),
               const SizedBox(height: 24),
-
-              // Summary cards – now with tappable inventory value / total spent card
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -193,25 +169,43 @@ class HomeScreen extends StatelessWidget {
                 crossAxisSpacing: 10,
                 childAspectRatio: 1.8,
                 children: [
-                  _CompactSummaryCard(icon: Icons.inventory_2_outlined, label: 'Total items', value: '$totalItems'),
-                  _CompactSummaryCard(icon: Icons.warning_amber_rounded, label: 'Low stock', value: '$lowStockCount', accentColor: Colors.orange),
-                  _CompactSummaryCard(icon: Icons.event_available, label: 'Expiring ≤7d', value: '$expiringSoonCount', accentColor: Colors.redAccent),
-                  _CompactSummaryCard(icon: Icons.shopping_cart_outlined, label: 'Shopping list', value: '$shoppingCount', accentColor: Colors.teal),
-                  _CompactSummaryCard(icon: Icons.restaurant_menu, label: 'Recipes', value: '$recipeCount'),
-                  // Tappable card showing both inventory value and total spent
+                  _CompactSummaryCard(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Total items',
+                    value: '$totalItems',
+                  ),
+                  _CompactSummaryCard(
+                    icon: Icons.warning_amber_rounded,
+                    label: 'Low stock',
+                    value: '$lowStockCount',
+                    accentColor: Colors.orange,
+                  ),
+                  _CompactSummaryCard(
+                    icon: Icons.event_available,
+                    label: 'Expiring ≤7d',
+                    value: '$expiringSoonCount',
+                    accentColor: Colors.redAccent,
+                  ),
+                  _CompactSummaryCard(
+                    icon: Icons.shopping_cart_outlined,
+                    label: 'Shopping list',
+                    value: '$shoppingCount',
+                    accentColor: Colors.teal,
+                  ),
+                  _CompactSummaryCard(
+                    icon: Icons.restaurant_menu,
+                    label: 'Recipes',
+                    value: '$recipeCount',
+                  ),
                   _TappableInventoryCard(
                     inventoryValue: '$symbol${inventoryValue.toStringAsFixed(2)}',
                     totalSpent: '$symbol${totalSpent.toStringAsFixed(2)}',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ExpenseDetailScreen()),
-                    ),
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ExpenseDetailScreen())),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Currency selection card
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -230,12 +224,10 @@ class HomeScreen extends StatelessWidget {
                         const Text('Currency', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
                         const Spacer(),
                         Consumer<CurrencyProvider>(
-                          builder: (context, cp, _) {
-                            return Text(
-                              '${cp.currencyCode} (${cp.currencySymbol})',
-                              style: const TextStyle(fontSize: 14, color: Colors.black54),
-                            );
-                          },
+                          builder: (context, cp, _) => Text(
+                            '${cp.currencyCode} (${cp.currencySymbol})',
+                            style: const TextStyle(fontSize: 14, color: Colors.black54),
+                          ),
                         ),
                         const SizedBox(width: 4),
                         const Icon(Icons.edit, size: 16, color: Colors.black54),
@@ -245,8 +237,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Category breakdown
               if (categoryCount.isNotEmpty) ...[
                 const Text('Categories', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
                 const SizedBox(height: 8),
@@ -268,10 +258,6 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
               ],
-
-              // Insights
-              const Text('Insights', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
-              const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -285,92 +271,106 @@ class HomeScreen extends StatelessWidget {
                   ),
                   InsightCard(
                     title: 'Last consumed',
-                    value: pantryProvider.recentConsumption.isEmpty ? 'None' : DateFormat('MMM d').format(pantryProvider.recentConsumption.first.dateTime),
+                    value: pantryProvider.recentConsumption.isEmpty
+                        ? 'None'
+                        : DateFormat('MMM d').format(pantryProvider.recentConsumption.first.dateTime),
                     icon: Icons.history,
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Quick actions
               const Text('Quick actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditScreen(item: null))),
-                      icon: const Icon(Icons.add, size: 18, color: Colors.white),
-                      label: const Text('Add item', style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A6375), padding: const EdgeInsets.symmetric(vertical: 10)),
-                    ),
+              Row(children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const AddEditScreen(item: null))),
+                    icon: const Icon(Icons.add, size: 18, color: Colors.white),
+                    label: const Text('Add item', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0A6375),
+                        padding: const EdgeInsets.symmetric(vertical: 10)),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
-                      icon: const Icon(Icons.shopping_cart, size: 18, color: Colors.black87),
-                      label: const Text('Shopping', style: TextStyle(color: Colors.black87)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.black38), padding: const EdgeInsets.symmetric(vertical: 10)),
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
+                    icon: const Icon(Icons.shopping_cart, size: 18, color: Colors.black87),
+                    label: const Text('Shopping', style: TextStyle(color: Colors.black87)),
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.black38),
+                        padding: const EdgeInsets.symmetric(vertical: 10)),
                   ),
-                ],
-              ),
+                ),
+              ]),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipesListScreen())),
-                      icon: const Icon(Icons.restaurant_menu, size: 18, color: Colors.black87),
-                      label: const Text('Recipes', style: TextStyle(color: Colors.black87)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.black38), padding: const EdgeInsets.symmetric(vertical: 10)),
-                    ),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const RecipesListScreen())),
+                    icon: const Icon(Icons.restaurant_menu, size: 18, color: Colors.black87),
+                    label: const Text('Recipes', style: TextStyle(color: Colors.black87)),
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.black38),
+                        padding: const EdgeInsets.symmetric(vertical: 10)),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MealPlannerScreen())),
-                      icon: const Icon(Icons.calendar_month, size: 18, color: Colors.black87),
-                      label: const Text('Meal plan', style: TextStyle(color: Colors.black87)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.black38), padding: const EdgeInsets.symmetric(vertical: 10)),
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const MealPlannerScreen())),
+                    icon: const Icon(Icons.calendar_month, size: 18, color: Colors.black87),
+                    label: const Text('Meal plan', style: TextStyle(color: Colors.black87)),
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.black38),
+                        padding: const EdgeInsets.symmetric(vertical: 10)),
                   ),
-                ],
-              ),
+                ),
+              ]),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen())),
-                      icon: const Icon(Icons.warning, size: 18, color: Colors.black87),
-                      label: const Text('Expiry', style: TextStyle(color: Colors.black87)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.black38), padding: const EdgeInsets.symmetric(vertical: 10)),
-                    ),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen())),
+                    icon: const Icon(Icons.warning, size: 18, color: Colors.black87),
+                    label: const Text('Expiry', style: TextStyle(color: Colors.black87)),
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.black38),
+                        padding: const EdgeInsets.symmetric(vertical: 10)),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantryItemsListScreen())),
-                      icon: const Icon(Icons.list, size: 18, color: Colors.black87),
-                      label: const Text('All items', style: TextStyle(color: Colors.black87)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.black38), padding: const EdgeInsets.symmetric(vertical: 10)),
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const PantryItemsListScreen())),
+                    icon: const Icon(Icons.list, size: 18, color: Colors.black87),
+                    label: const Text('All items', style: TextStyle(color: Colors.black87)),
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.black38),
+                        padding: const EdgeInsets.symmetric(vertical: 10)),
                   ),
-                ],
-              ),
+                ),
+              ]),
               const SizedBox(height: 24),
-
               if (urgentCount > 0)
                 Card(
                   color: Colors.orange.shade50,
                   child: ListTile(
                     leading: const Icon(Icons.warning, color: Colors.orange),
-                    title: const Text('Urgent items', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
-                    subtitle: Text('$lowStockCount low stock, $expiringSoonCount expiring soon', style: const TextStyle(color: Colors.black54)),
+                    title: const Text('Urgent items',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                    subtitle: Text('$lowStockCount low stock, $expiringSoonCount expiring soon',
+                        style: const TextStyle(color: Colors.black54)),
                     trailing: const Icon(Icons.arrow_forward, color: Colors.black54),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen())),
+                    onTap: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const ExpiryTrackerScreen())),
                   ),
                 ),
             ],
@@ -378,7 +378,8 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditScreen(item: null))),
+        onPressed: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const AddEditScreen(item: null))),
         backgroundColor: const Color(0xFF0A6375),
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -393,9 +394,9 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// ---------- Responsive summary card ----------
 class _CompactSummaryCard extends StatelessWidget {
   const _CompactSummaryCard({
+    super.key,
     required this.icon,
     required this.label,
     required this.value,
@@ -417,36 +418,36 @@ class _CompactSummaryCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color), maxLines: 1, overflow: TextOverflow.ellipsis),
-                ],
-              ),
+        child: Row(children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(label,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
             ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
   }
 }
 
-// ---------- Tappable inventory + total spent card ----------
 class _TappableInventoryCard extends StatelessWidget {
   const _TappableInventoryCard({
     required this.inventoryValue,
     required this.totalSpent,
     required this.onTap,
   });
-
   final String inventoryValue;
   final String totalSpent;
   final VoidCallback onTap;
@@ -468,33 +469,26 @@ class _TappableInventoryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.attach_money, color: Colors.green, size: 20),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Inventory: $inventoryValue',
+              Row(children: [
+                const Icon(Icons.attach_money, color: Colors.green, size: 20),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text('Inventory: $inventoryValue',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ]),
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.shopping_cart_checkout, color: Colors.teal, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Spent: $totalSpent',
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.chevron_right, size: 16, color: Colors.black54),
-                ],
-              ),
+              Row(children: [
+                const Icon(Icons.shopping_cart_checkout, color: Colors.teal, size: 18),
+                const SizedBox(width: 6), 
+                Expanded(
+                  child: Text('Spent: $totalSpent',
+                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                const Icon(Icons.chevron_right, size: 16, color: Colors.black54),
+              ]),
             ],
           ),
         ),

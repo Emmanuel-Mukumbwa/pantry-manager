@@ -62,6 +62,13 @@ class RecipeProvider extends ChangeNotifier {
     await prefs.setString(_storageKey, raw);
   }
 
+  /// Clears all recipes and saves an empty list.
+  Future<void> clearAll() async {
+    _recipes.clear();
+    notifyListeners();
+    await saveRecipes();
+  }
+
   Future<void> addRecipe({
     required String name,
     required String description,

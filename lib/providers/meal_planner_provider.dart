@@ -282,4 +282,11 @@ class MealPlannerProvider extends ChangeNotifier {
 
     return cooked;
   }
+
+  /// Clears all meal plan entries (for app reset)
+  Future<void> clearAll() async {
+    _mealPlan.clear();
+    notifyListeners();
+    await saveMealPlan();
+  }
 }

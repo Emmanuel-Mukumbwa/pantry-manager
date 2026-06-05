@@ -17,8 +17,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
   String _selectedUnit = 'piece';
-
-  // Base units (same as add/edit screen)
+ 
   final List<String> _baseUnits = const [
     'kg', 'g', 'litre', 'ml', 'piece', 'dozen', 'pack', 'can', 'bottle',
     'box', 'bunch', 'slice', 'cup', 'tablespoon', 'teaspoon',
@@ -127,7 +126,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _selectedUnit,
+                value: _selectedUnit,
                 items: _buildUnitMenuItems(),
                 decoration: const InputDecoration(
                   labelText: 'Unit',

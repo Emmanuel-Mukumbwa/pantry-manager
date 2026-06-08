@@ -207,7 +207,7 @@ class _MyAppState extends State<MyApp> {
 }
 
 class ThemeNotifier extends ChangeNotifier {
-  ThemeMode _mode = ThemeMode.system;
+  ThemeMode _mode = ThemeMode.light;
   ThemeMode get mode => _mode;
   void setMode(ThemeMode mode) {
     _mode = mode;
